@@ -180,6 +180,9 @@ if os.getenv("DATA_DIR"):
         if "empresa" not in _e:
             _e["empresa"] = None
             _mudou = True
+        if "jornada_semanal" not in _e:
+            _e["jornada_semanal"] = None
+            _mudou = True
     if _mudou:
         _save(EMPLOYEES_FILE, _employees_atuais)
 if not auth.USERS_FILE.exists() and os.getenv("DATA_DIR"):
@@ -252,6 +255,7 @@ class EmployeeIn(BaseModel):
     data_admissao: Optional[str] = None
     cpf: Optional[str] = None
     jornada: JornadaIn = JornadaIn()
+    jornada_semanal: Optional[str] = None
     senha: Optional[str] = None
 
 
@@ -262,6 +266,7 @@ class EmployeeUpdate(BaseModel):
     data_admissao: Optional[str] = None
     cpf: Optional[str] = None
     jornada: Optional[JornadaIn] = None
+    jornada_semanal: Optional[str] = None
     status: Optional[str] = None
     senha: Optional[str] = None
 
@@ -585,6 +590,7 @@ def criar_funcionario(data: EmployeeIn, _: dict = Depends(require_admin)):
         "data_admissao": data.data_admissao,
         "cpf": data.cpf,
         "jornada": data.jornada.model_dump(),
+        "jornada_semanal": data.jornada_semanal,
         "status": "ativo",
     }
     employees.append(novo)
@@ -605,7 +611,7 @@ def editar_funcionario(employee_id: int, data: EmployeeUpdate, _: dict = Depends
     emp = next((e for e in employees if e["id"] == employee_id), None)
     if not emp:
         raise HTTPException(404, "Funcionário não encontrado")
-    for field in ["nome", "empresa", "cargo", "data_admissao", "cpf", "status"]:
+    for field in ["nome", "empresa", "cargo", "data_admissao", "cpf", "jornada_semanal", "status"]:
         val = getattr(data, field)
         if val is not None:
             emp[field] = val

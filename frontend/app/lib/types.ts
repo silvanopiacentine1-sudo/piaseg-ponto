@@ -26,6 +26,7 @@ export interface Employee {
   data_admissao: string | null;
   cpf: string | null;
   jornada: Jornada;
+  jornada_semanal: string | null;
   status: "ativo" | "inativo";
 }
 

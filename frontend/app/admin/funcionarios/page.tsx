@@ -16,11 +16,15 @@ interface FormState {
   data_admissao: string;
   cpf: string;
   jornada: Jornada;
+  jornada_semanal: string;
   senha: string;
   status: "ativo" | "inativo";
 }
 
-const EMPTY_FORM: FormState = { nome: "", email: "", empresa: "", cargo: "", data_admissao: "", cpf: "", jornada: JORNADA_PADRAO, senha: "", status: "ativo" };
+const EMPTY_FORM: FormState = {
+  nome: "", email: "", empresa: "", cargo: "", data_admissao: "", cpf: "",
+  jornada: JORNADA_PADRAO, jornada_semanal: "", senha: "", status: "ativo",
+};
 
 export default function FuncionariosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -49,6 +53,7 @@ export default function FuncionariosPage() {
       data_admissao: e.data_admissao ?? "",
       cpf: e.cpf ?? "",
       jornada: e.jornada,
+      jornada_semanal: e.jornada_semanal ?? "",
       senha: "",
       status: e.status,
     });
@@ -75,6 +80,7 @@ export default function FuncionariosPage() {
             data_admissao: form.data_admissao || null,
             cpf: form.cpf || null,
             jornada: form.jornada,
+            jornada_semanal: form.jornada_semanal || null,
             status: form.status,
             senha: form.senha || undefined,
           }),
@@ -90,6 +96,7 @@ export default function FuncionariosPage() {
             data_admissao: form.data_admissao || null,
             cpf: form.cpf || null,
             jornada: form.jornada,
+            jornada_semanal: form.jornada_semanal || null,
             senha: form.senha || undefined,
           }),
         });
@@ -116,7 +123,54 @@ export default function FuncionariosPage() {
     }
   }
 
-  const employeesFiltrados = filtroEmpresa ? employees.filter((e) => e.empresa === filtroEmpresa) : employees;
+  function TabelaGrupo({ empresa, lista }: { empresa: Empresa; lista: Employee[] }) {
+    return (
+      <div className="bg-white rounded-xl shadow overflow-x-auto mb-6">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+          <span className={`text-xs rounded-full px-2 py-0.5 border ${empresa === "Corretora" ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-purple-50 text-purple-800 border-purple-200"}`}>
+            {empresa}
+          </span>
+          <h2 className="font-heading text-tiber text-sm">{lista.length} funcionário{lista.length === 1 ? "" : "s"}</h2>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-gray-500 border-b border-gray-100">
+              <th className="py-2 px-4 w-10">Nº</th>
+              <th className="py-2 px-4">Nome</th>
+              <th className="py-2 px-4">E-mail</th>
+              <th className="py-2 px-4">Cargo</th>
+              <th className="py-2 px-4">Status</th>
+              <th className="py-2 px-4" />
+            </tr>
+          </thead>
+          <tbody>
+            {lista.map((e, idx) => (
+              <tr key={e.id} className="border-b border-gray-50">
+                <td className="py-2 px-4 text-gray-400 tabular-nums">{idx + 1}</td>
+                <td className="py-2 px-4">{e.nome}</td>
+                <td className="py-2 px-4 text-gray-500">{e.email}</td>
+                <td className="py-2 px-4">{e.cargo}</td>
+                <td className="py-2 px-4">
+                  <span className={`text-xs rounded-full px-2 py-0.5 border ${e.status === "ativo" ? "bg-green-50 text-green-800 border-green-300" : "bg-gray-100 text-gray-500 border-gray-300"}`}>
+                    {e.status === "ativo" ? "Ativo" : "Inativo"}
+                  </span>
+                </td>
+                <td className="py-2 px-4 text-right whitespace-nowrap">
+                  <button onClick={() => editar(e)} className="text-tiber hover:underline text-xs mr-3">Editar</button>
+                  <button disabled={excluindo === e.id} onClick={() => excluir(e)} className="text-red-600 hover:underline text-xs disabled:opacity-60">
+                    {excluindo === e.id ? "Excluindo..." : "Excluir"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {lista.length === 0 && <p className="text-sm text-gray-400 p-4">Nenhum funcionário cadastrado nessa empresa.</p>}
+      </div>
+    );
+  }
+
+  const gruposVisiveis = filtroEmpresa ? EMPRESAS.filter((emp) => emp === filtroEmpresa) : EMPRESAS;
 
   return (
     <div className="min-h-dvh bg-respiro flex flex-col">
@@ -201,6 +255,16 @@ export default function FuncionariosPage() {
               </div>
             </div>
 
+            <div className="sm:col-span-2">
+              <label className="block text-xs text-gray-500 mb-1">Jornada Semanal</label>
+              <input
+                value={form.jornada_semanal}
+                onChange={(e) => setForm({ ...form, jornada_semanal: e.target.value })}
+                placeholder="ex: 44h semanais, segunda a sexta"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+
             <div className="sm:col-span-2 flex gap-3">
               <button disabled={salvando} type="submit" className="bg-twine text-tiber font-medium px-4 py-2 rounded-lg text-sm hover:bg-twine-dark hover:text-white transition disabled:opacity-60">
                 {salvando ? "Salvando..." : "Salvar"}
@@ -212,50 +276,9 @@ export default function FuncionariosPage() {
           </form>
         )}
 
-        <div className="bg-white rounded-xl shadow overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 border-b border-gray-100">
-                <th className="py-2 px-4">Nome</th>
-                <th className="py-2 px-4">E-mail</th>
-                <th className="py-2 px-4">Empresa</th>
-                <th className="py-2 px-4">Cargo</th>
-                <th className="py-2 px-4">Status</th>
-                <th className="py-2 px-4" />
-              </tr>
-            </thead>
-            <tbody>
-              {employeesFiltrados.map((e) => (
-                <tr key={e.id} className="border-b border-gray-50">
-                  <td className="py-2 px-4">{e.nome}</td>
-                  <td className="py-2 px-4 text-gray-500">{e.email}</td>
-                  <td className="py-2 px-4">
-                    {e.empresa ? (
-                      <span className={`text-xs rounded-full px-2 py-0.5 border ${e.empresa === "Corretora" ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-purple-50 text-purple-800 border-purple-200"}`}>
-                        {e.empresa}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="py-2 px-4">{e.cargo}</td>
-                  <td className="py-2 px-4">
-                    <span className={`text-xs rounded-full px-2 py-0.5 border ${e.status === "ativo" ? "bg-green-50 text-green-800 border-green-300" : "bg-gray-100 text-gray-500 border-gray-300"}`}>
-                      {e.status === "ativo" ? "Ativo" : "Inativo"}
-                    </span>
-                  </td>
-                  <td className="py-2 px-4 text-right whitespace-nowrap">
-                    <button onClick={() => editar(e)} className="text-tiber hover:underline text-xs mr-3">Editar</button>
-                    <button disabled={excluindo === e.id} onClick={() => excluir(e)} className="text-red-600 hover:underline text-xs disabled:opacity-60">
-                      {excluindo === e.id ? "Excluindo..." : "Excluir"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {employeesFiltrados.length === 0 && <p className="text-sm text-gray-400 p-4">Nenhum funcionário cadastrado.</p>}
-        </div>
+        {gruposVisiveis.map((emp) => (
+          <TabelaGrupo key={emp} empresa={emp} lista={employees.filter((e) => e.empresa === emp)} />
+        ))}
       </main>
     </div>
   );

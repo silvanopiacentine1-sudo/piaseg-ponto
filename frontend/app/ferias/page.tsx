@@ -98,7 +98,7 @@ export default function FeriasPage() {
           <form onSubmit={enviarAgendamento} className="bg-white rounded-xl shadow p-5 mb-6 grid sm:grid-cols-2 gap-3">
             {erro && <div className="sm:col-span-2 rounded-lg bg-red-50 border border-red-300 text-red-700 text-sm px-3 py-2">{erro}</div>}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Ano de referência</label>
+              <label className="block text-xs text-gray-500 mb-1">Usufruto de férias</label>
               <input type="number" required value={ano} onChange={(e) => setAno(Number(e.target.value))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div />
