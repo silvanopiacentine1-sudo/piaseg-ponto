@@ -40,7 +40,11 @@ export default function RelatoriosPage() {
     <div className="min-h-dvh bg-respiro flex flex-col">
       <Header />
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
-        <h1 className="font-heading text-tiber text-xl mb-6">Relatórios e Indicadores</h1>
+        <h1 className="font-heading text-tiber text-xl mb-1">Relatórios e Indicadores</h1>
+        <p className="text-xs text-gray-500 mb-5">
+          Sem período selecionado, mostra do dia 1º do mês atual até hoje. Fins de semana e feriados nacionais são
+          ignorados automaticamente no cálculo de faltas.
+        </p>
 
         <div className="bg-white rounded-xl shadow p-4 mb-6 grid sm:grid-cols-3 gap-3">
           <div>
@@ -138,7 +142,15 @@ export default function RelatoriosPage() {
                                 <td className="py-1 tabular-nums">{formatMinutes(d.minutos_trabalhados)}</td>
                                 <td className="py-1 tabular-nums">{formatMinutes(d.minutos_esperados)}</td>
                                 <td className={`py-1 tabular-nums ${d.saldo_minutos >= 0 ? "text-[#1baf7a]" : "text-[#e34948]"}`}>{formatMinutes(d.saldo_minutos)}</td>
-                                <td className="py-1">{d.incompleto ? <span className="text-[#eda100]">Incompleto</span> : ""}</td>
+                                <td className="py-1">
+                                  {d.status === "trabalhado" ? (
+                                    d.incompleto && <span className="text-[#eda100]">Incompleto</span>
+                                  ) : (
+                                    <span className={d.status === "Falta Injustificada" ? "text-[#e34948] font-medium" : "text-[#2a78d6]"}>
+                                      {d.status}
+                                    </span>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>

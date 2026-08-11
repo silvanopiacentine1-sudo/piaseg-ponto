@@ -5,3 +5,4 @@ __pycache__/
 time_entries.json
 leave_requests.json
 backups/
+files/

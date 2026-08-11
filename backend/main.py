@@ -1,14 +1,15 @@
 import json
 import os
 import shutil
+import uuid
 from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, HTTPException, Header
+from fastapi import Depends, FastAPI, File, HTTPException, Header, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 import auth
@@ -33,8 +34,13 @@ _BUNDLED = {
     LEAVE_REQUESTS_FILE: APP_DIR / "leave_requests.json",
 }
 
-DEFAULT_LEAVE_TYPES = ["Férias", "Folga", "Atestado Médico", "Falta Justificada", "Falta Injustificada", "Licença"]
+DEFAULT_LEAVE_TYPES = ["Férias", "Folga", "Atestado Médico", "Falta Justificada", "Falta Injustificada", "Licença", "Atraso"]
 PUNCH_SEQUENCE = ["entrada", "saida_almoco", "retorno_almoco", "saida"]
+
+FILES_DIR = DATA_DIR / "files"
+FILES_DIR.mkdir(parents=True, exist_ok=True)
+ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"}
+MAX_FILE_SIZE = 15 * 1024 * 1024  # 15MB
 
 
 def _load(path: Path, default):
@@ -91,6 +97,51 @@ def _parse_local(ts_str: str) -> datetime:
     return ts
 
 
+def _pascoa(ano: int) -> date:
+    """Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher)."""
+    a = ano % 19
+    b = ano // 100
+    c = ano % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    mes = (h + l - 7 * m + 114) // 31
+    dia = ((h + l - 7 * m + 114) % 31) + 1
+    return date(ano, mes, dia)
+
+
+def feriados_nacionais(ano: int) -> set[date]:
+    """Feriados nacionais fixos por lei + Sexta-feira Santa (móvel).
+    NÃO inclui pontos facultativos (Carnaval, Corpus Christi) nem feriados municipais/estaduais,
+    que variam por decreto/local — esses são tratados via abono em lote manual."""
+    pascoa = _pascoa(ano)
+    sexta_santa = pascoa - timedelta(days=2)
+    fixos = [
+        date(ano, 1, 1),   # Confraternização Universal
+        date(ano, 4, 21),  # Tiradentes
+        date(ano, 5, 1),   # Dia do Trabalho
+        date(ano, 9, 7),   # Independência
+        date(ano, 10, 12),  # Nossa Senhora Aparecida
+        date(ano, 11, 2),  # Finados
+        date(ano, 11, 15),  # Proclamação da República
+        date(ano, 11, 20),  # Consciência Negra (feriado nacional desde a Lei 14.759/2023)
+        date(ano, 12, 25),  # Natal
+    ]
+    return set(fixos) | {sexta_santa}
+
+
+def eh_dia_util(d: date) -> bool:
+    if d.weekday() >= 5:  # sábado=5, domingo=6
+        return False
+    return d not in feriados_nacionais(d.year)
+
+
 # --- backup automático a cada subida (mesmo padrão dos outros projetos Piaseg) ---
 def _run_startup_backup() -> None:
     if not os.getenv("DATA_DIR"):
@@ -107,8 +158,10 @@ def _run_startup_backup() -> None:
 
 
 _run_startup_backup()
-if not LEAVE_TYPES_FILE.exists() and os.getenv("DATA_DIR"):
-    _save(LEAVE_TYPES_FILE, list(DEFAULT_LEAVE_TYPES))
+_tipos_atuais = load_leave_types()
+_tipos_faltantes = [t for t in DEFAULT_LEAVE_TYPES if t not in _tipos_atuais]
+if os.getenv("DATA_DIR") and (not LEAVE_TYPES_FILE.exists() or _tipos_faltantes):
+    _save(LEAVE_TYPES_FILE, _tipos_atuais + _tipos_faltantes)
 if not auth.USERS_FILE.exists() and os.getenv("DATA_DIR"):
     auth.save_users([{
         "username": "admin",
@@ -203,10 +256,17 @@ class SolicitacaoIn(BaseModel):
     data_inicio: str
     data_fim: str
     observacao: str = ""
+    anexo: Optional[str] = None
 
 
 class DecisaoIn(BaseModel):
     observacao_admin: str = ""
+
+
+class AbonoLoteIn(BaseModel):
+    data: str
+    tipo: str = "Falta Justificada"
+    motivo: str
 
 
 # ---------------- auth routes ----------------
@@ -281,6 +341,31 @@ def tipos_solicitacao():
     return load_leave_types()
 
 
+@app.post("/solicitacoes/upload")
+async def upload_anexo_solicitacao(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    original_name = os.path.basename(file.filename or "")
+    ext = Path(original_name).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(400, f"Tipo de arquivo não permitido. Use: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(400, "Arquivo muito grande (máximo 15MB)")
+    stored_name = f"{uuid.uuid4().hex[:8]}_{original_name}"
+    (FILES_DIR / stored_name).write_bytes(content)
+    return {"filename": stored_name, "original_name": original_name}
+
+
+@app.get("/solicitacoes/arquivo/{filename}")
+def baixar_anexo_solicitacao(filename: str, user: dict = Depends(get_current_user)):
+    if "/" in filename or ".." in filename:
+        raise HTTPException(400, "Nome de arquivo inválido")
+    file_path = FILES_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(404, "Arquivo não encontrado")
+    display_name = filename.split("_", 1)[1] if "_" in filename else filename
+    return FileResponse(file_path, filename=display_name)
+
+
 @app.post("/solicitacoes")
 def criar_solicitacao(data: SolicitacaoIn, user: dict = Depends(get_current_user)):
     emp = require_employee_record(user)
@@ -294,6 +379,7 @@ def criar_solicitacao(data: SolicitacaoIn, user: dict = Depends(get_current_user
         "data_inicio": data.data_inicio,
         "data_fim": data.data_fim,
         "observacao": data.observacao,
+        "anexo": data.anexo,
         "status": "pendente",
         "criado_em": datetime.now(SP_TZ).isoformat(),
         "decidido_por": None,
@@ -456,6 +542,52 @@ def rejeitar_solicitacao(req_id: int, data: DecisaoIn, admin: dict = Depends(req
     return _decidir_solicitacao(req_id, "rejeitado", data, admin)
 
 
+@app.post("/admin/abonar-lote")
+def abonar_lote(payload: AbonoLoteIn, admin: dict = Depends(require_admin)):
+    """Cria uma solicitação já aprovada para todos os funcionários ativos numa data —
+    para feriados municipais e pontos facultativos, que não entram no cálculo automático
+    de feriados nacionais."""
+    if payload.tipo not in load_leave_types():
+        raise HTTPException(400, "Tipo de solicitação inválido")
+    if not payload.motivo.strip():
+        raise HTTPException(400, "motivo é obrigatório")
+    employees = [e for e in load_employees() if e["status"] == "ativo"]
+    reqs = load_requests()
+    agora = datetime.now(SP_TZ).isoformat()
+    criados = 0
+    for emp in employees:
+        ja_coberto = any(
+            r["employee_id"] == emp["id"] and r["status"] == "aprovado"
+            and r["data_inicio"] <= payload.data <= r["data_fim"]
+            for r in reqs
+        )
+        if ja_coberto:
+            continue
+        reqs.append({
+            "id": _next_id(reqs),
+            "employee_id": emp["id"],
+            "tipo": payload.tipo,
+            "data_inicio": payload.data,
+            "data_fim": payload.data,
+            "observacao": payload.motivo,
+            "anexo": None,
+            "status": "aprovado",
+            "criado_em": agora,
+            "decidido_por": admin["sub"],
+            "decidido_em": agora,
+            "observacao_admin": payload.motivo,
+        })
+        criados += 1
+    save_requests(reqs)
+    return {"criados": criados, "pulados": len(employees) - criados}
+
+
+@app.get("/admin/feriados-nacionais")
+def listar_feriados_nacionais(ano: Optional[int] = None, _: dict = Depends(require_admin)):
+    ano = ano or datetime.now(SP_TZ).year
+    return sorted(d.isoformat() for d in feriados_nacionais(ano))
+
+
 # ---------------- admin: relatórios ----------------
 def _minutes(hhmm: str) -> int:
     h, m = hhmm.split(":")
@@ -477,52 +609,76 @@ def relatorios(employee_id: Optional[int] = None, inicio: Optional[str] = None, 
     employees = load_employees()
     if employee_id:
         employees = [e for e in employees if e["id"] == employee_id]
+
+    hoje = datetime.now(SP_TZ).date()
+    data_inicio = date.fromisoformat(inicio) if inicio else hoje.replace(day=1)
+    data_fim = min(date.fromisoformat(fim) if fim else hoje, hoje)
+
+    dias_uteis = []
+    d = data_inicio
+    while d <= data_fim:
+        if eh_dia_util(d):
+            dias_uteis.append(d)
+        d += timedelta(days=1)
+
     all_entries = load_entries()
-    all_requests = [r for r in load_requests() if r["status"] == "aprovado"]
+    all_requests_aprovadas = [r for r in load_requests() if r["status"] == "aprovado"]
 
     resultado = []
     for emp in employees:
-        emp_entries = [e for e in all_entries if e["employee_id"] == emp["id"]]
-        if inicio:
-            emp_entries = [e for e in emp_entries if e["data_local"] >= inicio]
-        if fim:
-            emp_entries = [e for e in emp_entries if e["data_local"] <= fim]
-        by_day: dict[str, list[dict]] = {}
-        for e in emp_entries:
-            by_day.setdefault(e["data_local"], []).append(e)
+        emp_entries_by_day: dict[str, list[dict]] = {}
+        for e in all_entries:
+            if e["employee_id"] == emp["id"]:
+                emp_entries_by_day.setdefault(e["data_local"], []).append(e)
+        emp_requests = [r for r in all_requests_aprovadas if r["employee_id"] == emp["id"]]
+        admissao = date.fromisoformat(emp["data_admissao"]) if emp.get("data_admissao") else None
 
         jornada = emp["jornada"]
         esperado_dia = (_minutes(jornada["saida_almoco"]) - _minutes(jornada["entrada"])) + (
             _minutes(jornada["saida"]) - _minutes(jornada["retorno_almoco"])
         )
+
         dias = []
         saldo_total = 0
-        for dia, es in sorted(by_day.items()):
-            trabalhado = _work_minutes_for_day(es)
-            saldo = trabalhado - esperado_dia
-            saldo_total += saldo
+        por_tipo: dict[str, int] = {}
+        for dia in dias_uteis:
+            if admissao and dia < admissao:
+                continue
+            dia_str = dia.isoformat()
+            es = emp_entries_by_day.get(dia_str)
+            if es:
+                trabalhado = _work_minutes_for_day(es)
+                saldo = trabalhado - esperado_dia
+                dias.append({
+                    "data": dia_str,
+                    "status": "trabalhado",
+                    "minutos_trabalhados": trabalhado,
+                    "minutos_esperados": esperado_dia,
+                    "saldo_minutos": saldo,
+                    "incompleto": len(es) % 2 == 1,
+                })
+                saldo_total += saldo
+                continue
+
+            leave = next((r for r in emp_requests if r["data_inicio"] <= dia_str <= r["data_fim"]), None)
+            tipo_dia = leave["tipo"] if leave else "Falta Injustificada"
+            saldo = -esperado_dia if tipo_dia == "Falta Injustificada" else 0
             dias.append({
-                "data": dia,
-                "minutos_trabalhados": trabalhado,
+                "data": dia_str,
+                "status": tipo_dia,
+                "minutos_trabalhados": 0,
                 "minutos_esperados": esperado_dia,
                 "saldo_minutos": saldo,
-                "incompleto": len(es) % 2 == 1,
+                "incompleto": False,
             })
-
-        emp_requests = [r for r in all_requests if r["employee_id"] == emp["id"]]
-        if inicio:
-            emp_requests = [r for r in emp_requests if r["data_fim"] >= inicio]
-        if fim:
-            emp_requests = [r for r in emp_requests if r["data_inicio"] <= fim]
-        por_tipo: dict[str, int] = {}
-        for r in emp_requests:
-            por_tipo[r["tipo"]] = por_tipo.get(r["tipo"], 0) + 1
+            saldo_total += saldo
+            por_tipo[tipo_dia] = por_tipo.get(tipo_dia, 0) + 1
 
         resultado.append({
             "employee_id": emp["id"],
             "nome": emp["nome"],
-            "dias_trabalhados": len(dias),
-            "minutos_trabalhados_total": sum(d["minutos_trabalhados"] for d in dias),
+            "dias_trabalhados": sum(1 for x in dias if x["status"] == "trabalhado"),
+            "minutos_trabalhados_total": sum(x["minutos_trabalhados"] for x in dias),
             "saldo_minutos_total": saldo_total,
             "ausencias_por_tipo": por_tipo,
             "dias": dias,

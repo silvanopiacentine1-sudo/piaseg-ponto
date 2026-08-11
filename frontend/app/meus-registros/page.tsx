@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Header from "../components/Header";
-import { apiJson } from "../lib/api";
+import { apiJson, downloadFile, uploadFile } from "../lib/api";
 import { formatDateTime, LeaveRequest, PUNCH_LABELS, TimeEntry } from "../lib/types";
 
 const STATUS_LABELS: Record<string, string> = { pendente: "Pendente", aprovado: "Aprovado", rejeitado: "Rejeitado" };
@@ -21,6 +21,8 @@ export default function MeusRegistrosPage() {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
@@ -48,14 +50,21 @@ export default function MeusRegistrosPage() {
     setSucesso("");
     setEnviando(true);
     try {
+      let anexo: string | undefined;
+      if (arquivo) {
+        const uploaded = await uploadFile("/solicitacoes/upload", arquivo);
+        anexo = uploaded.filename;
+      }
       await apiJson("/solicitacoes", {
         method: "POST",
-        body: JSON.stringify({ tipo, data_inicio: dataInicio, data_fim: dataFim, observacao }),
+        body: JSON.stringify({ tipo, data_inicio: dataInicio, data_fim: dataFim, observacao, anexo }),
       });
       setSucesso("Solicitação enviada com sucesso.");
       setDataInicio("");
       setDataFim("");
       setObservacao("");
+      setArquivo(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       setShowForm(false);
       await carregar();
     } catch {
@@ -107,6 +116,36 @@ export default function MeusRegistrosPage() {
                 <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={2} />
               </div>
               <div className="sm:col-span-2">
+                <label className="block text-xs text-gray-500 mb-1">Anexo (opcional — PDF, Word ou Excel)</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                  onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
+                  className="hidden"
+                />
+                {arquivo ? (
+                  <div className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-dashed border-twine bg-respiro">
+                    <span className="text-sm truncate text-tiber">📎 {arquivo.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setArquivo(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                      className="text-xs font-semibold shrink-0 text-red-600"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-lg text-sm font-medium border-2 border-dashed border-gray-200 text-tiber bg-respiro hover:border-twine transition"
+                  >
+                    📎 Clique aqui para anexar um arquivo
+                  </button>
+                )}
+              </div>
+              <div className="sm:col-span-2">
                 <button disabled={enviando} type="submit" className="bg-twine text-tiber font-medium px-4 py-2 rounded-lg text-sm hover:bg-twine-dark hover:text-white transition disabled:opacity-60">
                   {enviando ? "Enviando..." : "Enviar solicitação"}
                 </button>
@@ -121,6 +160,14 @@ export default function MeusRegistrosPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-800">{r.tipo}</p>
                   <p className="text-xs text-gray-500">{r.data_inicio} a {r.data_fim}{r.observacao ? ` — ${r.observacao}` : ""}</p>
+                  {r.anexo && (
+                    <button
+                      onClick={() => downloadFile(`/solicitacoes/arquivo/${r.anexo}`, r.anexo!.split("_").slice(1).join("_") || r.anexo!)}
+                      className="text-xs text-tiber hover:underline mt-0.5"
+                    >
+                      📎 Ver anexo
+                    </button>
+                  )}
                 </div>
                 <span className={`text-xs border rounded-full px-2.5 py-1 ${STATUS_COLORS[r.status]}`}>{STATUS_LABELS[r.status]}</span>
               </li>

@@ -27,6 +27,12 @@ export async function apiJson<T>(path: string, options: RequestInit = {}): Promi
   return res.json();
 }
 
+export async function uploadFile(path: string, file: File): Promise<{ filename: string; original_name: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiJson(path, { method: "POST", body: formData });
+}
+
 export async function downloadFile(path: string, suggestedName: string): Promise<void> {
   const res = await apiFetch(path);
   if (!res.ok) throw new Error("Não foi possível baixar o arquivo");

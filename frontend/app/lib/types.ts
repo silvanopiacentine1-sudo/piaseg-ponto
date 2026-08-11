@@ -41,6 +41,7 @@ export interface LeaveRequest {
   data_inicio: string;
   data_fim: string;
   observacao: string;
+  anexo: string | null;
   status: LeaveStatus;
   criado_em: string;
   decidido_por: string | null;
@@ -50,6 +51,7 @@ export interface LeaveRequest {
 
 export interface ReportDay {
   data: string;
+  status: string;
   minutos_trabalhados: number;
   minutos_esperados: number;
   saldo_minutos: number;
