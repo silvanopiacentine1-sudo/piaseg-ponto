@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+time_entries.json
+leave_requests.json
+backups/
