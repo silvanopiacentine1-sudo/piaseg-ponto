@@ -7,6 +7,13 @@ export interface Jornada {
   saida: string;
 }
 
+export interface AdminUser {
+  username: string;
+  name: string;
+  role: "admin";
+  employee_id: number | null;
+}
+
 export const EMPRESAS = ["Corretora", "Franchising"] as const;
 export type Empresa = (typeof EMPRESAS)[number];
 

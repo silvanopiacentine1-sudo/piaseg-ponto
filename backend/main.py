@@ -285,6 +285,17 @@ class DecisaoIn(BaseModel):
     observacao_admin: str = ""
 
 
+class AdminUserIn(BaseModel):
+    username: str
+    name: str
+    senha: str
+
+
+class AdminUserUpdate(BaseModel):
+    name: Optional[str] = None
+    senha: Optional[str] = None
+
+
 class AbonoLoteIn(BaseModel):
     data: str
     tipo: str = "Falta Justificada"
@@ -502,6 +513,40 @@ def ajustar_agendamento_ferias_funcionario(sched_id: int, data: AjusteFeriasIn, 
     })
     save_vacation_schedules(schedules)
     return sched
+
+
+# ---------------- admin: administradores ----------------
+@app.get("/admin/administradores")
+def listar_administradores(_: dict = Depends(require_admin)):
+    return [auth._public_user(u) for u in auth.load_users() if u.get("role") == "admin"]
+
+
+@app.post("/admin/administradores")
+def criar_administrador(data: AdminUserIn, _: dict = Depends(require_admin)):
+    try:
+        return auth.create_user(data.username, data.name, data.senha, "admin", None)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.put("/admin/administradores/{username}")
+def editar_administrador(username: str, data: AdminUserUpdate, _: dict = Depends(require_admin)):
+    updated = auth.update_user(username, name=data.name, password=data.senha)
+    if not updated:
+        raise HTTPException(404, "Administrador não encontrado")
+    return updated
+
+
+@app.delete("/admin/administradores/{username}")
+def excluir_administrador(username: str, admin: dict = Depends(require_admin)):
+    admins = [u for u in auth.load_users() if u.get("role") == "admin"]
+    if len(admins) <= 1:
+        raise HTTPException(409, "Não é possível excluir o último administrador do sistema")
+    if username == admin["sub"]:
+        raise HTTPException(400, "Você não pode excluir seu próprio usuário enquanto está logado com ele")
+    if not auth.delete_user(username):
+        raise HTTPException(404, "Administrador não encontrado")
+    return {"excluido": username}
 
 
 # ---------------- admin: funcionários ----------------

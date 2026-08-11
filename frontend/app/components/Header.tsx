@@ -17,6 +17,7 @@ const ADMIN_LINKS = [
   { href: "/admin/solicitacoes", label: "Solicitações" },
   { href: "/admin/ferias", label: "Férias" },
   { href: "/admin/relatorios", label: "Relatórios" },
+  { href: "/admin/administradores", label: "Administradores" },
 ];
 
 export default function Header() {
