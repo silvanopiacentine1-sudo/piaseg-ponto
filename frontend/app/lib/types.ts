@@ -87,6 +87,7 @@ export interface DashboardData {
   ferias_pendentes: number;
   minutos_trabalhados_total: number;
   saldo_minutos_medio: number;
+  minutos_extras_total: number;
   ausencias_por_tipo: Record<string, number>;
   saldo_por_funcionario: { nome: string; saldo_minutos: number }[];
 }

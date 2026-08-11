@@ -107,7 +107,7 @@ export default function RelatoriosPage() {
 
         {dashboard && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
               <KpiCard label="Funcionários ativos" valor={dashboard.total_funcionarios_ativos} />
               <KpiCard label="Solicitações pendentes" valor={dashboard.solicitacoes_pendentes} />
               <KpiCard label="Férias pendentes" valor={dashboard.ferias_pendentes} />
@@ -115,7 +115,14 @@ export default function RelatoriosPage() {
                 label="Saldo médio do período"
                 valor={<span className={dashboard.saldo_minutos_medio >= 0 ? "text-[#1baf7a]" : "text-[#e34948]"}>{formatMinutes(dashboard.saldo_minutos_medio)}</span>}
               />
+              <KpiCard
+                label="Horas extras do período"
+                valor={<span className="text-[#1baf7a]">{formatMinutes(dashboard.minutos_extras_total)}</span>}
+              />
             </div>
+            <p className="text-xs text-gray-400 -mt-4 mb-6">
+              "Saldo médio" é líquido (hora extra credita, falta/saída antecipada debita). "Horas extras" soma só os dias em que o funcionário trabalhou além do esperado, sem descontar faltas.
+            </p>
 
             <div className="grid sm:grid-cols-2 gap-6 mb-6">
               <div className="bg-white rounded-xl shadow p-5">

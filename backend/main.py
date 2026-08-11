@@ -1013,6 +1013,14 @@ def dashboard(empresa: Optional[str] = None, inicio: Optional[str] = None, fim: 
 
     total_minutos = sum(r["minutos_trabalhados_total"] for r in relatorios_emp)
     saldo_medio = int(sum(r["saldo_minutos_total"] for r in relatorios_emp) / len(relatorios_emp)) if relatorios_emp else 0
+    # Só o lado positivo do saldo diário (dias trabalhados além do esperado) — complementa o saldo líquido,
+    # que já mistura crédito de hora extra com débito de falta/saída antecipada.
+    minutos_extras_total = sum(
+        d["saldo_minutos"]
+        for r in relatorios_emp
+        for d in r["dias"]
+        if d["status"] == "trabalhado" and d["saldo_minutos"] > 0
+    )
 
     ids_filtrados = {e["id"] for e in employees_filtrados}
     solicitacoes_pendentes = sum(
@@ -1028,6 +1036,7 @@ def dashboard(empresa: Optional[str] = None, inicio: Optional[str] = None, fim: 
         "ferias_pendentes": ferias_pendentes,
         "minutos_trabalhados_total": total_minutos,
         "saldo_minutos_medio": saldo_medio,
+        "minutos_extras_total": minutos_extras_total,
         "ausencias_por_tipo": ausencias_agregadas,
         "saldo_por_funcionario": saldo_por_funcionario,
     }
