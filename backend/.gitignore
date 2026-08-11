@@ -4,5 +4,6 @@ __pycache__/
 .env
 time_entries.json
 leave_requests.json
+vacation_schedules.json
 backups/
 files/

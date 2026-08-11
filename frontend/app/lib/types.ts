@@ -7,10 +7,14 @@ export interface Jornada {
   saida: string;
 }
 
+export const EMPRESAS = ["Corretora", "Franchising"] as const;
+export type Empresa = (typeof EMPRESAS)[number];
+
 export interface Employee {
   id: number;
   nome: string;
   email: string;
+  empresa: Empresa | null;
   cargo: string;
   data_admissao: string | null;
   cpf: string | null;
@@ -61,11 +65,50 @@ export interface ReportDay {
 export interface EmployeeReport {
   employee_id: number;
   nome: string;
+  empresa: Empresa | null;
   dias_trabalhados: number;
   minutos_trabalhados_total: number;
   saldo_minutos_total: number;
   ausencias_por_tipo: Record<string, number>;
   dias: ReportDay[];
+}
+
+export interface DashboardData {
+  total_funcionarios_ativos: number;
+  solicitacoes_pendentes: number;
+  ferias_pendentes: number;
+  minutos_trabalhados_total: number;
+  saldo_minutos_medio: number;
+  ausencias_por_tipo: Record<string, number>;
+  saldo_por_funcionario: { nome: string; saldo_minutos: number }[];
+}
+
+export type VacationStatus = "pendente" | "aprovado" | "rejeitado";
+
+export interface VacationHistoryEntry {
+  data_inicio: string;
+  data_fim: string;
+  por: "funcionario" | "admin";
+  motivo: string;
+  criado_em: string;
+}
+
+export interface VacationSchedule {
+  id: number;
+  employee_id: number;
+  ano: number;
+  data_inicio: string;
+  data_fim: string;
+  observacao: string;
+  historico: VacationHistoryEntry[];
+  status: VacationStatus;
+  proposto_por: "funcionario" | "admin";
+  criado_em: string;
+  atualizado_em: string;
+  decidido_por: string | null;
+  decidido_em: string | null;
+  observacao_admin: string;
+  leave_request_id: number | null;
 }
 
 export const PUNCH_LABELS: Record<PunchType, string> = {

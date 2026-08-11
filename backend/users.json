@@ -2,7 +2,7 @@
   {
     "username": "admin",
     "name": "Administrador",
-    "password_hash": "$2b$12$ULmjU9uqZC26VpE1UuoJSu.2e6TNE3sF1ML3L4GDfNOhPaOe/SE9y",
+    "password_hash": "$2b$12$qh21cBtzjWgvhlwaPYjpSOqyWsoyIbmFzcosUymF0lIYzCzL7yuki",
     "role": "admin",
     "employee_id": null
   }

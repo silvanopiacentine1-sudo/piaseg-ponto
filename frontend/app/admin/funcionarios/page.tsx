@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Header from "../../components/Header";
 import { apiJson } from "../../lib/api";
-import { Employee, Jornada } from "../../lib/types";
+import { Empresa, EMPRESAS, Employee, Jornada } from "../../lib/types";
 
 const JORNADA_PADRAO: Jornada = { entrada: "08:00", saida_almoco: "12:00", retorno_almoco: "13:00", saida: "18:00" };
 
@@ -11,6 +11,7 @@ interface FormState {
   id?: number;
   nome: string;
   email: string;
+  empresa: Empresa | "";
   cargo: string;
   data_admissao: string;
   cpf: string;
@@ -19,7 +20,7 @@ interface FormState {
   status: "ativo" | "inativo";
 }
 
-const EMPTY_FORM: FormState = { nome: "", email: "", cargo: "", data_admissao: "", cpf: "", jornada: JORNADA_PADRAO, senha: "", status: "ativo" };
+const EMPTY_FORM: FormState = { nome: "", email: "", empresa: "", cargo: "", data_admissao: "", cpf: "", jornada: JORNADA_PADRAO, senha: "", status: "ativo" };
 
 export default function FuncionariosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -27,6 +28,8 @@ export default function FuncionariosPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [excluindo, setExcluindo] = useState<number | null>(null);
+  const [filtroEmpresa, setFiltroEmpresa] = useState("");
 
   async function carregar() {
     setEmployees(await apiJson<Employee[]>("/admin/funcionarios"));
@@ -41,6 +44,7 @@ export default function FuncionariosPage() {
       id: e.id,
       nome: e.nome,
       email: e.email,
+      empresa: e.empresa ?? "",
       cargo: e.cargo,
       data_admissao: e.data_admissao ?? "",
       cpf: e.cpf ?? "",
@@ -66,6 +70,7 @@ export default function FuncionariosPage() {
           method: "PUT",
           body: JSON.stringify({
             nome: form.nome,
+            empresa: form.empresa || undefined,
             cargo: form.cargo,
             data_admissao: form.data_admissao || null,
             cpf: form.cpf || null,
@@ -80,6 +85,7 @@ export default function FuncionariosPage() {
           body: JSON.stringify({
             nome: form.nome,
             email: form.email,
+            empresa: form.empresa,
             cargo: form.cargo,
             data_admissao: form.data_admissao || null,
             cpf: form.cpf || null,
@@ -97,15 +103,38 @@ export default function FuncionariosPage() {
     }
   }
 
+  async function excluir(e: Employee) {
+    if (!confirm(`Excluir ${e.nome}? Isso também remove o login e o histórico de ponto/solicitações dele. Não pode ser desfeito.`)) return;
+    setExcluindo(e.id);
+    try {
+      await apiJson(`/admin/funcionarios/${e.id}`, { method: "DELETE" });
+      await carregar();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível excluir.");
+    } finally {
+      setExcluindo(null);
+    }
+  }
+
+  const employeesFiltrados = filtroEmpresa ? employees.filter((e) => e.empresa === filtroEmpresa) : employees;
+
   return (
     <div className="min-h-dvh bg-respiro flex flex-col">
       <Header />
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <h1 className="font-heading text-tiber text-xl">Funcionários</h1>
-          <button onClick={novo} className="bg-tiber text-white px-4 py-2 rounded-lg text-sm hover:bg-tiber-light transition">
-            + Novo funcionário
-          </button>
+          <div className="flex gap-2 items-center">
+            <select value={filtroEmpresa} onChange={(e) => setFiltroEmpresa(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">Todas as empresas</option>
+              {EMPRESAS.map((emp) => (
+                <option key={emp} value={emp}>{emp}</option>
+              ))}
+            </select>
+            <button onClick={novo} className="bg-tiber text-white px-4 py-2 rounded-lg text-sm hover:bg-tiber-light transition">
+              + Novo funcionário
+            </button>
+          </div>
         </div>
 
         {showForm && (
@@ -119,6 +148,15 @@ export default function FuncionariosPage() {
             <div>
               <label className="block text-xs text-gray-500 mb-1">E-mail (login)</label>
               <input type="email" required disabled={!!form.id} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-100" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Empresa</label>
+              <select required value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value as Empresa })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="" disabled>Selecione...</option>
+                {EMPRESAS.map((emp) => (
+                  <option key={emp} value={emp}>{emp}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Cargo</label>
@@ -180,30 +218,43 @@ export default function FuncionariosPage() {
               <tr className="text-left text-gray-500 border-b border-gray-100">
                 <th className="py-2 px-4">Nome</th>
                 <th className="py-2 px-4">E-mail</th>
+                <th className="py-2 px-4">Empresa</th>
                 <th className="py-2 px-4">Cargo</th>
                 <th className="py-2 px-4">Status</th>
                 <th className="py-2 px-4" />
               </tr>
             </thead>
             <tbody>
-              {employees.map((e) => (
+              {employeesFiltrados.map((e) => (
                 <tr key={e.id} className="border-b border-gray-50">
                   <td className="py-2 px-4">{e.nome}</td>
                   <td className="py-2 px-4 text-gray-500">{e.email}</td>
+                  <td className="py-2 px-4">
+                    {e.empresa ? (
+                      <span className={`text-xs rounded-full px-2 py-0.5 border ${e.empresa === "Corretora" ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-purple-50 text-purple-800 border-purple-200"}`}>
+                        {e.empresa}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
                   <td className="py-2 px-4">{e.cargo}</td>
                   <td className="py-2 px-4">
                     <span className={`text-xs rounded-full px-2 py-0.5 border ${e.status === "ativo" ? "bg-green-50 text-green-800 border-green-300" : "bg-gray-100 text-gray-500 border-gray-300"}`}>
                       {e.status === "ativo" ? "Ativo" : "Inativo"}
                     </span>
                   </td>
-                  <td className="py-2 px-4 text-right">
-                    <button onClick={() => editar(e)} className="text-tiber hover:underline text-xs">Editar</button>
+                  <td className="py-2 px-4 text-right whitespace-nowrap">
+                    <button onClick={() => editar(e)} className="text-tiber hover:underline text-xs mr-3">Editar</button>
+                    <button disabled={excluindo === e.id} onClick={() => excluir(e)} className="text-red-600 hover:underline text-xs disabled:opacity-60">
+                      {excluindo === e.id ? "Excluindo..." : "Excluir"}
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {employees.length === 0 && <p className="text-sm text-gray-400 p-4">Nenhum funcionário cadastrado.</p>}
+          {employeesFiltrados.length === 0 && <p className="text-sm text-gray-400 p-4">Nenhum funcionário cadastrado.</p>}
         </div>
       </main>
     </div>

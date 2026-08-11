@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import Header from "../../components/Header";
 import { apiJson, downloadFile } from "../../lib/api";
-import { Employee, formatDateTime, PUNCH_LABELS, TimeEntry } from "../../lib/types";
+import { Employee, EMPRESAS, formatDateTime, PUNCH_LABELS, TimeEntry } from "../../lib/types";
 
 export default function RegistrosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [employeeId, setEmployeeId] = useState("");
+  const [empresa, setEmpresa] = useState("");
   const [inicio, setInicio] = useState("");
   const [fim, setFim] = useState("");
   const [corrigindo, setCorrigindo] = useState<TimeEntry | null>(null);
@@ -23,6 +24,7 @@ export default function RegistrosPage() {
   async function carregarEntries() {
     const params = new URLSearchParams();
     if (employeeId) params.set("employee_id", employeeId);
+    if (empresa) params.set("empresa", empresa);
     if (inicio) params.set("inicio", inicio);
     if (fim) params.set("fim", fim);
     setEntries(await apiJson<TimeEntry[]>(`/admin/registros?${params.toString()}`));
@@ -35,7 +37,7 @@ export default function RegistrosPage() {
   useEffect(() => {
     carregarEntries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, inicio, fim]);
+  }, [employeeId, empresa, inicio, fim]);
 
   function nomeDe(id: number): string {
     return employees.find((e) => e.id === id)?.nome ?? `#${id}`;
@@ -74,13 +76,13 @@ export default function RegistrosPage() {
           <h1 className="font-heading text-tiber text-xl">Registros de Ponto</h1>
           <div className="flex gap-2">
             <button
-              onClick={() => downloadFile(`/admin/export/excel?${new URLSearchParams({ ...(inicio && { inicio }), ...(fim && { fim }) })}`, "registros_ponto.xlsx")}
+              onClick={() => downloadFile(`/admin/export/excel?${new URLSearchParams({ ...(empresa && { empresa }), ...(inicio && { inicio }), ...(fim && { fim }) })}`, "registros_ponto.xlsx")}
               className="text-sm bg-white border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
             >
               Exportar Excel
             </button>
             <button
-              onClick={() => downloadFile(`/admin/export/afd?${new URLSearchParams({ ...(inicio && { inicio }), ...(fim && { fim }) })}`, "afd_aproximado.txt")}
+              onClick={() => downloadFile(`/admin/export/afd?${new URLSearchParams({ ...(empresa && { empresa }), ...(inicio && { inicio }), ...(fim && { fim }) })}`, "afd_aproximado.txt")}
               className="text-sm bg-white border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
             >
               Exportar AFD
@@ -88,12 +90,21 @@ export default function RegistrosPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow p-4 mb-4 grid sm:grid-cols-3 gap-3">
+        <div className="bg-white rounded-xl shadow p-4 mb-4 grid sm:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Empresa</label>
+            <select value={empresa} onChange={(e) => setEmpresa(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">Todas</option>
+              {EMPRESAS.map((emp) => (
+                <option key={emp} value={emp}>{emp}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">Funcionário</label>
             <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
               <option value="">Todos</option>
-              {employees.map((e) => (
+              {employees.filter((e) => !empresa || e.empresa === empresa).map((e) => (
                 <option key={e.id} value={e.id}>{e.nome}</option>
               ))}
             </select>

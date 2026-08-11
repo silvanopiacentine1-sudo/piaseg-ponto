@@ -8,12 +8,14 @@ import { getName, isAdmin, logout } from "../lib/auth";
 const EMPLOYEE_LINKS = [
   { href: "/ponto", label: "Bater Ponto" },
   { href: "/meus-registros", label: "Meus Registros" },
+  { href: "/ferias", label: "Férias" },
 ];
 
 const ADMIN_LINKS = [
   { href: "/admin/funcionarios", label: "Funcionários" },
   { href: "/admin/registros", label: "Registros" },
   { href: "/admin/solicitacoes", label: "Solicitações" },
+  { href: "/admin/ferias", label: "Férias" },
   { href: "/admin/relatorios", label: "Relatórios" },
 ];
 
