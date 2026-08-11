@@ -57,6 +57,9 @@ export default function Header() {
         </nav>
         <div className="flex items-center gap-3 text-sm">
           <span className="text-white/70">{name}</span>
+          <Link href="/alterar-senha" className="text-white/80 hover:text-white underline underline-offset-2">
+            Alterar senha
+          </Link>
           <button onClick={handleLogout} className="text-white/80 hover:text-white underline underline-offset-2">
             Sair
           </button>

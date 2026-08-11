@@ -232,6 +232,11 @@ class LoginIn(BaseModel):
     password: str
 
 
+class AlterarSenhaIn(BaseModel):
+    senha_atual: str
+    senha_nova: str
+
+
 class JornadaIn(BaseModel):
     entrada: str = "08:00"
     saida_almoco: str = "12:00"
@@ -332,6 +337,17 @@ def login(data: LoginIn):
 @app.get("/auth/me")
 def me(user: dict = Depends(get_current_user)):
     return user
+
+
+@app.put("/auth/alterar-senha")
+def alterar_senha(data: AlterarSenhaIn, user: dict = Depends(get_current_user)):
+    if len(data.senha_nova.strip()) < 4:
+        raise HTTPException(400, "A nova senha deve ter pelo menos 4 caracteres")
+    if not auth.authenticate(user["sub"], data.senha_atual):
+        # 400, não 401: um 401 aqui seria interpretado pelo frontend como sessão expirada e deslogaria o usuário
+        raise HTTPException(400, "Senha atual incorreta")
+    auth.update_user(user["sub"], password=data.senha_nova)
+    return {"ok": True}
 
 
 # ---------------- ponto (funcionário) ----------------
