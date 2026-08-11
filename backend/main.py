@@ -38,6 +38,8 @@ _BUNDLED = {
 
 DEFAULT_LEAVE_TYPES = ["Férias", "Folga", "Atestado Médico", "Falta Justificada", "Falta Injustificada", "Licença", "Atraso"]
 PUNCH_SEQUENCE = ["entrada", "saida_almoco", "retorno_almoco", "saida"]
+INTERMEDIARIO_SEQUENCE = ["saida_intermediaria", "retorno_intermediaria"]
+ALL_PUNCH_TYPES = PUNCH_SEQUENCE + INTERMEDIARIO_SEQUENCE
 EMPRESAS = ["Corretora", "Franchising"]
 
 FILES_DIR = DATA_DIR / "files"
@@ -362,19 +364,21 @@ def _today_entries(employee_id: int) -> list[dict]:
     return sorted(entries, key=lambda e: e["timestamp"])
 
 
-@app.get("/ponto/status-hoje")
-def status_hoje(user: dict = Depends(get_current_user)):
-    emp = require_employee_record(user)
-    entries = _today_entries(emp["id"])
-    proximo = PUNCH_SEQUENCE[len(entries) % 4]
-    return {"registros_hoje": entries, "proximo_tipo": proximo}
+def _proximo_tipo_padrao(entries_hoje: list[dict]) -> str:
+    """Ciclo entrada/saída almoço/retorno almoço/saída, contando só as marcações
+    padrão — marcações intermediárias (ex: saída pro dentista) não desalinham o ciclo."""
+    count = sum(1 for e in entries_hoje if e["tipo"] in PUNCH_SEQUENCE)
+    return PUNCH_SEQUENCE[count % 4]
 
 
-@app.post("/ponto/bater")
-def bater_ponto(user: dict = Depends(get_current_user)):
-    emp = require_employee_record(user)
-    entries_hoje = _today_entries(emp["id"])
-    tipo = PUNCH_SEQUENCE[len(entries_hoje) % 4]
+def _proximo_tipo_intermediario(entries_hoje: list[dict]) -> str:
+    """Saída/retorno intermediário é um ciclo de 2 à parte, independente do padrão."""
+    saidas = sum(1 for e in entries_hoje if e["tipo"] == "saida_intermediaria")
+    retornos = sum(1 for e in entries_hoje if e["tipo"] == "retorno_intermediaria")
+    return "retorno_intermediaria" if saidas > retornos else "saida_intermediaria"
+
+
+def _registrar_ponto(emp: dict, tipo: str) -> dict:
     now = datetime.now(SP_TZ)
     entry = {
         "id": _next_id(load_entries()),
@@ -392,7 +396,38 @@ def bater_ponto(user: dict = Depends(get_current_user)):
     entries = load_entries()
     entries.append(entry)
     save_entries(entries)
-    return {"comprovante": entry, "mensagem": f"Ponto registrado: {tipo.replace('_', ' ')} às {now.strftime('%H:%M:%S')}"}
+    return entry
+
+
+@app.get("/ponto/status-hoje")
+def status_hoje(user: dict = Depends(get_current_user)):
+    emp = require_employee_record(user)
+    entries = _today_entries(emp["id"])
+    return {
+        "registros_hoje": entries,
+        "proximo_tipo": _proximo_tipo_padrao(entries),
+        "proximo_tipo_intermediario": _proximo_tipo_intermediario(entries),
+    }
+
+
+@app.post("/ponto/bater")
+def bater_ponto(user: dict = Depends(get_current_user)):
+    emp = require_employee_record(user)
+    tipo = _proximo_tipo_padrao(_today_entries(emp["id"]))
+    entry = _registrar_ponto(emp, tipo)
+    ts = datetime.fromisoformat(entry["timestamp"])
+    return {"comprovante": entry, "mensagem": f"Ponto registrado: {tipo.replace('_', ' ')} às {ts.strftime('%H:%M:%S')}"}
+
+
+@app.post("/ponto/bater-intermediario")
+def bater_ponto_intermediario(user: dict = Depends(get_current_user)):
+    """Saída/retorno intermediário — para quando o funcionário precisa sair no meio
+    do expediente (ex: consulta médica) fora do horário de almoço."""
+    emp = require_employee_record(user)
+    tipo = _proximo_tipo_intermediario(_today_entries(emp["id"]))
+    entry = _registrar_ponto(emp, tipo)
+    ts = datetime.fromisoformat(entry["timestamp"])
+    return {"comprovante": entry, "mensagem": f"Ponto registrado: {tipo.replace('_', ' ')} às {ts.strftime('%H:%M:%S')}"}
 
 
 @app.get("/ponto/meus-registros")
@@ -655,8 +690,8 @@ def listar_registros(employee_id: Optional[int] = None, empresa: Optional[str] =
 
 @app.post("/admin/registros")
 def registro_manual(data: RegistroManualIn, admin: dict = Depends(require_admin)):
-    if data.tipo not in PUNCH_SEQUENCE:
-        raise HTTPException(400, f"tipo deve ser um de {PUNCH_SEQUENCE}")
+    if data.tipo not in ALL_PUNCH_TYPES:
+        raise HTTPException(400, f"tipo deve ser um de {ALL_PUNCH_TYPES}")
     if not data.motivo.strip():
         raise HTTPException(400, "motivo é obrigatório para registro manual")
     ts = _parse_local(data.timestamp)

@@ -1,4 +1,4 @@
-export type PunchType = "entrada" | "saida_almoco" | "retorno_almoco" | "saida";
+export type PunchType = "entrada" | "saida_almoco" | "retorno_almoco" | "saida" | "saida_intermediaria" | "retorno_intermediaria";
 
 export interface Jornada {
   entrada: string;
@@ -125,6 +125,8 @@ export const PUNCH_LABELS: Record<PunchType, string> = {
   saida_almoco: "Saída Almoço",
   retorno_almoco: "Retorno Almoço",
   saida: "Saída",
+  saida_intermediaria: "Saída Intermediária",
+  retorno_intermediaria: "Retorno Intermediário",
 };
 
 export function formatMinutes(min: number): string {

@@ -8,11 +8,13 @@ import { PUNCH_LABELS, TimeEntry } from "../lib/types";
 interface StatusHoje {
   registros_hoje: TimeEntry[];
   proximo_tipo: keyof typeof PUNCH_LABELS;
+  proximo_tipo_intermediario: keyof typeof PUNCH_LABELS;
 }
 
 export default function PontoPage() {
   const [status, setStatus] = useState<StatusHoje | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingIntermediario, setLoadingIntermediario] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [relogio, setRelogio] = useState(new Date());
@@ -47,6 +49,21 @@ export default function PontoPage() {
     }
   }
 
+  async function baterIntermediario() {
+    setLoadingIntermediario(true);
+    setErro("");
+    setMensagem("");
+    try {
+      const res = await apiJson<{ mensagem: string }>("/ponto/bater-intermediario", { method: "POST" });
+      setMensagem(res.mensagem);
+      await carregar();
+    } catch {
+      setErro("Não foi possível registrar o ponto. Tente novamente.");
+    } finally {
+      setLoadingIntermediario(false);
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-respiro flex flex-col">
       <Header />
@@ -74,6 +91,18 @@ export default function PontoPage() {
           <span>Bater Ponto</span>
           {status && <span className="text-twine text-base font-sans">{PUNCH_LABELS[status.proximo_tipo]}</span>}
         </button>
+
+        <button
+          id="btn-bater-intermediario"
+          onClick={baterIntermediario}
+          disabled={loadingIntermediario}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium border-2 border-twine text-tiber bg-white hover:bg-respiro-dark transition disabled:opacity-60"
+        >
+          🚪 {status ? PUNCH_LABELS[status.proximo_tipo_intermediario] : "Saída/Retorno Intermediário"}
+        </button>
+        <p className="text-xs text-gray-400 -mt-4 text-center">
+          Use para saídas fora do horário de almoço (ex: consulta médica, dentista) — bate a saída e, ao voltar, o retorno.
+        </p>
 
         <div className="w-full bg-white rounded-xl shadow p-4">
           <h2 className="font-heading text-tiber text-sm mb-3">Marcações de hoje</h2>
