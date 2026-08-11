@@ -36,7 +36,7 @@ _BUNDLED = {
     VACATION_SCHEDULES_FILE: APP_DIR / "vacation_schedules.json",
 }
 
-DEFAULT_LEAVE_TYPES = ["Férias", "Folga", "Atestado Médico", "Falta Justificada", "Falta Injustificada", "Licença", "Atraso"]
+DEFAULT_LEAVE_TYPES = ["Férias", "Folga", "Atestado Médico", "Falta Justificada", "Falta Injustificada", "Licença", "Atraso", "Saída Intermediária"]
 PUNCH_SEQUENCE = ["entrada", "saida_almoco", "retorno_almoco", "saida"]
 INTERMEDIARIO_SEQUENCE = ["saida_intermediaria", "retorno_intermediaria"]
 ALL_PUNCH_TYPES = PUNCH_SEQUENCE + INTERMEDIARIO_SEQUENCE
@@ -397,6 +397,12 @@ def _registrar_ponto(emp: dict, tipo: str) -> dict:
     entries.append(entry)
     save_entries(entries)
     return entry
+
+
+@app.get("/ponto/minha-jornada")
+def minha_jornada(user: dict = Depends(get_current_user)):
+    emp = require_employee_record(user)
+    return emp["jornada"]
 
 
 @app.get("/ponto/status-hoje")

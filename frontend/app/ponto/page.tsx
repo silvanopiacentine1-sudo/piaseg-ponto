@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Header from "../components/Header";
 import { apiJson } from "../lib/api";
-import { PUNCH_LABELS, TimeEntry } from "../lib/types";
+import { entradaAtrasada, Jornada, PUNCH_LABELS, TimeEntry } from "../lib/types";
 
 interface StatusHoje {
   registros_hoje: TimeEntry[];
@@ -13,6 +13,7 @@ interface StatusHoje {
 
 export default function PontoPage() {
   const [status, setStatus] = useState<StatusHoje | null>(null);
+  const [jornada, setJornada] = useState<Jornada | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingIntermediario, setLoadingIntermediario] = useState(false);
   const [mensagem, setMensagem] = useState("");
@@ -28,8 +29,17 @@ export default function PontoPage() {
     }
   }
 
+  async function carregarJornada() {
+    try {
+      setJornada(await apiJson<Jornada>("/ponto/minha-jornada"));
+    } catch {
+      // não bloqueia a tela — só o destaque de atraso fica desativado
+    }
+  }
+
   useEffect(() => {
     carregar();
+    carregarJornada();
     const t = setInterval(() => setRelogio(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -110,14 +120,20 @@ export default function PontoPage() {
             <p className="text-sm text-gray-400">Nenhuma marcação ainda.</p>
           )}
           <ul className="space-y-2">
-            {status?.registros_hoje.map((e) => (
-              <li key={e.id} className="flex justify-between text-sm border-b border-gray-100 pb-2 last:border-0">
-                <span className="text-gray-700">{PUNCH_LABELS[e.tipo]}</span>
-                <span className="tabular-nums text-gray-500">
-                  {new Date(e.timestamp).toLocaleTimeString("pt-BR")}
-                </span>
-              </li>
-            ))}
+            {status?.registros_hoje.map((e) => {
+              const atrasado = entradaAtrasada(e, jornada?.entrada);
+              return (
+                <li key={e.id} className="flex justify-between text-sm border-b border-gray-100 pb-2 last:border-0">
+                  <span className="text-gray-700">
+                    {PUNCH_LABELS[e.tipo]}
+                    {atrasado && <span className="ml-1.5 text-[10px] text-red-600 font-medium align-middle">ATRASADO</span>}
+                  </span>
+                  <span className={`tabular-nums ${atrasado ? "text-red-600 font-semibold" : "text-gray-500"}`}>
+                    {new Date(e.timestamp).toLocaleTimeString("pt-BR")}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </main>

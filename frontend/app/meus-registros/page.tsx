@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Header from "../components/Header";
 import { apiJson, downloadFile, uploadFile } from "../lib/api";
-import { formatDateTime, LeaveRequest, PUNCH_LABELS, TimeEntry } from "../lib/types";
+import { entradaAtrasada, formatDateTime, Jornada, LeaveRequest, PUNCH_LABELS, TimeEntry } from "../lib/types";
 
 const STATUS_LABELS: Record<string, string> = { pendente: "Pendente", aprovado: "Aprovado", rejeitado: "Rejeitado" };
 const STATUS_COLORS: Record<string, string> = {
@@ -14,6 +14,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function MeusRegistrosPage() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [jornada, setJornada] = useState<Jornada | null>(null);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [tipos, setTipos] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -28,14 +29,16 @@ export default function MeusRegistrosPage() {
   const [sucesso, setSucesso] = useState("");
 
   async function carregar() {
-    const [e, r, t] = await Promise.all([
+    const [e, r, t, j] = await Promise.all([
       apiJson<TimeEntry[]>("/ponto/meus-registros"),
       apiJson<LeaveRequest[]>("/solicitacoes/minhas"),
       apiJson<string[]>("/solicitacoes/tipos"),
+      apiJson<Jornada>("/ponto/minha-jornada"),
     ]);
     setEntries(e);
     setRequests(r);
     setTipos(t);
+    setJornada(j);
     if (!tipo && t.length) setTipo(t[0]);
   }
 
@@ -187,13 +190,19 @@ export default function MeusRegistrosPage() {
                 </tr>
               </thead>
               <tbody>
-                {entries.map((e) => (
-                  <tr key={e.id} className="border-b border-gray-50">
-                    <td className="py-2 pr-4 tabular-nums">{formatDateTime(e.timestamp)}</td>
-                    <td className="py-2 pr-4">{PUNCH_LABELS[e.tipo]}</td>
-                    <td className="py-2">{e.corrected ? <span className="text-xs text-twine-dark">Sim</span> : ""}</td>
-                  </tr>
-                ))}
+                {entries.map((e) => {
+                  const atrasado = entradaAtrasada(e, jornada?.entrada);
+                  return (
+                    <tr key={e.id} className="border-b border-gray-50">
+                      <td className={`py-2 pr-4 tabular-nums ${atrasado ? "text-red-600 font-semibold" : ""}`}>{formatDateTime(e.timestamp)}</td>
+                      <td className="py-2 pr-4">
+                        {PUNCH_LABELS[e.tipo]}
+                        {atrasado && <span className="ml-1.5 text-[10px] text-red-600 font-medium">ATRASADO</span>}
+                      </td>
+                      <td className="py-2">{e.corrected ? <span className="text-xs text-twine-dark">Sim</span> : ""}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {entries.length === 0 && <p className="text-sm text-gray-400 py-2">Nenhum registro ainda.</p>}

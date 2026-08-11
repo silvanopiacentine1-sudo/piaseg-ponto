@@ -146,3 +146,12 @@ export function formatDate(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
+
+export function entradaAtrasada(entry: { tipo: PunchType; timestamp: string }, jornadaEntrada: string | null | undefined): boolean {
+  if (entry.tipo !== "entrada" || !jornadaEntrada) return false;
+  const [hEsperado, mEsperado] = jornadaEntrada.split(":").map(Number);
+  const d = new Date(entry.timestamp);
+  const minutosReais = d.getHours() * 60 + d.getMinutes();
+  const minutosEsperados = hEsperado * 60 + mEsperado;
+  return minutosReais > minutosEsperados;
+}
