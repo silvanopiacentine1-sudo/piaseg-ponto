@@ -27,15 +27,23 @@ export default function MeusRegistrosPage() {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
+  const [filtroDia, setFiltroDia] = useState("");
+
+  async function carregarEntries() {
+    const params = new URLSearchParams();
+    if (filtroDia) {
+      params.set("inicio", filtroDia);
+      params.set("fim", filtroDia);
+    }
+    setEntries(await apiJson<TimeEntry[]>(`/ponto/meus-registros?${params.toString()}`));
+  }
 
   async function carregar() {
-    const [e, r, t, j] = await Promise.all([
-      apiJson<TimeEntry[]>("/ponto/meus-registros"),
+    const [r, t, j] = await Promise.all([
       apiJson<LeaveRequest[]>("/solicitacoes/minhas"),
       apiJson<string[]>("/solicitacoes/tipos"),
       apiJson<Jornada>("/ponto/minha-jornada"),
     ]);
-    setEntries(e);
     setRequests(r);
     setTipos(t);
     setJornada(j);
@@ -46,6 +54,11 @@ export default function MeusRegistrosPage() {
     carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    carregarEntries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroDia]);
 
   async function enviarSolicitacao(ev: React.FormEvent) {
     ev.preventDefault();
@@ -179,7 +192,23 @@ export default function MeusRegistrosPage() {
         </section>
 
         <section className="bg-white rounded-xl shadow p-5">
-          <h2 className="font-heading text-tiber text-lg mb-4">Meus registros de ponto</h2>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <h2 className="font-heading text-tiber text-lg">Meus registros de ponto</h2>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500">Filtrar por dia</label>
+              <input
+                type="date"
+                value={filtroDia}
+                onChange={(e) => setFiltroDia(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+              />
+              {filtroDia && (
+                <button onClick={() => setFiltroDia("")} className="text-xs text-tiber hover:underline">
+                  Limpar
+                </button>
+              )}
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -205,7 +234,11 @@ export default function MeusRegistrosPage() {
                 })}
               </tbody>
             </table>
-            {entries.length === 0 && <p className="text-sm text-gray-400 py-2">Nenhum registro ainda.</p>}
+            {entries.length === 0 && (
+              <p className="text-sm text-gray-400 py-2">
+                {filtroDia ? "Nenhum registro nesse dia." : "Nenhum registro ainda."}
+              </p>
+            )}
           </div>
         </section>
       </main>
