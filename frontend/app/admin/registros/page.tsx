@@ -15,6 +15,8 @@ export default function RegistrosPage() {
   const [corrigindo, setCorrigindo] = useState<TimeEntry | null>(null);
   const [novoHorario, setNovoHorario] = useState("");
   const [motivo, setMotivo] = useState("");
+  const [excluindo, setExcluindo] = useState<TimeEntry | null>(null);
+  const [motivoExclusao, setMotivoExclusao] = useState("");
   const [erro, setErro] = useState("");
 
   async function carregarEmployees() {
@@ -44,6 +46,7 @@ export default function RegistrosPage() {
   }
 
   function abrirCorrecao(e: TimeEntry) {
+    setExcluindo(null);
     setCorrigindo(e);
     const d = new Date(e.timestamp);
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -65,6 +68,29 @@ export default function RegistrosPage() {
       await carregarEntries();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível corrigir.");
+    }
+  }
+
+  function abrirExclusao(e: TimeEntry) {
+    setCorrigindo(null);
+    setExcluindo(e);
+    setMotivoExclusao("");
+    setErro("");
+  }
+
+  async function confirmarExclusao(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (!excluindo) return;
+    setErro("");
+    try {
+      await apiJson(`/admin/registros/${excluindo.id}/excluir`, {
+        method: "POST",
+        body: JSON.stringify({ motivo: motivoExclusao }),
+      });
+      setExcluindo(null);
+      await carregarEntries();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível excluir.");
     }
   }
 
@@ -143,6 +169,26 @@ export default function RegistrosPage() {
           </form>
         )}
 
+        {excluindo && (
+          <form onSubmit={confirmarExclusao} className="bg-white rounded-xl shadow p-5 mb-4 space-y-3 border-2 border-red-200">
+            <h2 className="font-heading text-red-700 text-sm">
+              Excluir registro — {nomeDe(excluindo.employee_id)} ({PUNCH_LABELS[excluindo.tipo]} às {formatDateTime(excluindo.timestamp)})
+            </h2>
+            <p className="text-xs text-gray-500">
+              Use isto para apagar registros fantasma (ex: clique duplo que multiplicou a marcação). Não pode ser desfeito — o registro fica guardado num log de auditoria interno, mas some da lista e dos relatórios do funcionário.
+            </p>
+            {erro && <div className="rounded-lg bg-red-50 border border-red-300 text-red-700 text-sm px-3 py-2">{erro}</div>}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Motivo da exclusão (obrigatório)</label>
+              <input required value={motivoExclusao} onChange={(e) => setMotivoExclusao(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Ex: registro duplicado por clique duplo" />
+            </div>
+            <div className="flex gap-3">
+              <button type="submit" className="bg-red-600 text-white font-medium px-4 py-2 rounded-lg text-sm hover:bg-red-700 transition">Confirmar exclusão</button>
+              <button type="button" onClick={() => setExcluindo(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition">Cancelar</button>
+            </div>
+          </form>
+        )}
+
         <div className="bg-white rounded-xl shadow overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -165,8 +211,9 @@ export default function RegistrosPage() {
                   <td className="py-2 px-4">
                     {e.corrected ? <span title={e.correction_reason ?? ""} className="text-xs text-twine-dark cursor-help">Sim</span> : ""}
                   </td>
-                  <td className="py-2 px-4 text-right">
-                    <button onClick={() => abrirCorrecao(e)} className="text-tiber hover:underline text-xs">Corrigir</button>
+                  <td className="py-2 px-4 text-right whitespace-nowrap">
+                    <button onClick={() => abrirCorrecao(e)} className="text-tiber hover:underline text-xs mr-3">Corrigir</button>
+                    <button onClick={() => abrirExclusao(e)} className="text-red-600 hover:underline text-xs">Excluir</button>
                   </td>
                 </tr>
               ))}

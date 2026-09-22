@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Header from "../components/Header";
 import { apiJson } from "../lib/api";
 import { entradaAtrasada, Jornada, PUNCH_LABELS, TimeEntry } from "../lib/types";
@@ -19,6 +19,9 @@ export default function PontoPage() {
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [relogio, setRelogio] = useState(new Date());
+  // trava síncrona contra clique/toque duplo: o `disabled` do React só some do DOM
+  // no próximo render, então um segundo clique dentro do mesmo instante ainda passaria
+  const enviandoRef = useRef(false);
 
   async function carregar() {
     try {
@@ -45,6 +48,8 @@ export default function PontoPage() {
   }, []);
 
   async function bater() {
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
     setLoading(true);
     setErro("");
     setMensagem("");
@@ -52,14 +57,17 @@ export default function PontoPage() {
       const res = await apiJson<{ mensagem: string }>("/ponto/bater", { method: "POST" });
       setMensagem(res.mensagem);
       await carregar();
-    } catch {
-      setErro("Não foi possível registrar o ponto. Tente novamente.");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível registrar o ponto. Tente novamente.");
     } finally {
+      enviandoRef.current = false;
       setLoading(false);
     }
   }
 
   async function baterIntermediario() {
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
     setLoadingIntermediario(true);
     setErro("");
     setMensagem("");
@@ -67,9 +75,10 @@ export default function PontoPage() {
       const res = await apiJson<{ mensagem: string }>("/ponto/bater-intermediario", { method: "POST" });
       setMensagem(res.mensagem);
       await carregar();
-    } catch {
-      setErro("Não foi possível registrar o ponto. Tente novamente.");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível registrar o ponto. Tente novamente.");
     } finally {
+      enviandoRef.current = false;
       setLoadingIntermediario(false);
     }
   }

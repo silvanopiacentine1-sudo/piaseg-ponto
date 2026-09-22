@@ -27,6 +27,12 @@ TIME_ENTRIES_FILE = DATA_DIR / "time_entries.json"
 LEAVE_TYPES_FILE = DATA_DIR / "leave_types.json"
 LEAVE_REQUESTS_FILE = DATA_DIR / "leave_requests.json"
 VACATION_SCHEDULES_FILE = DATA_DIR / "vacation_schedules.json"
+DELETED_ENTRIES_FILE = DATA_DIR / "deleted_entries.json"
+
+# tempo mínimo entre duas marcações de ponto do mesmo funcionário — trava clique/toque
+# duplo (mobile principalmente), que criava registros fantasma e desalinhava o ciclo
+# entrada/saída almoço/retorno almoço/saída pro resto do dia
+DUPLICATE_GUARD_SECONDS = 8
 
 _BUNDLED = {
     EMPLOYEES_FILE: APP_DIR / "employees.json",
@@ -98,6 +104,14 @@ def save_vacation_schedules(v: list[dict]) -> None:
     _save(VACATION_SCHEDULES_FILE, v)
 
 
+def load_deleted_entries() -> list[dict]:
+    return _load(DELETED_ENTRIES_FILE, [])
+
+
+def save_deleted_entries(v: list[dict]) -> None:
+    _save(DELETED_ENTRIES_FILE, v)
+
+
 def _next_id(items: list[dict]) -> int:
     return (max((i["id"] for i in items), default=0)) + 1
 
@@ -162,7 +176,7 @@ def _run_startup_backup() -> None:
     backups_dir = DATA_DIR / "backups"
     snapshot_dir = backups_dir / datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    for f in [EMPLOYEES_FILE, TIME_ENTRIES_FILE, LEAVE_TYPES_FILE, LEAVE_REQUESTS_FILE, VACATION_SCHEDULES_FILE, DATA_DIR / "users.json"]:
+    for f in [EMPLOYEES_FILE, TIME_ENTRIES_FILE, LEAVE_TYPES_FILE, LEAVE_REQUESTS_FILE, VACATION_SCHEDULES_FILE, DELETED_ENTRIES_FILE, DATA_DIR / "users.json"]:
         if f.exists():
             shutil.copy2(f, snapshot_dir / f.name)
     snapshots = sorted(backups_dir.glob("*"), key=lambda p: p.name)
@@ -278,6 +292,10 @@ class CorrecaoIn(BaseModel):
     motivo: str
 
 
+class ExclusaoIn(BaseModel):
+    motivo: str
+
+
 class RegistroManualIn(BaseModel):
     employee_id: int
     tipo: str
@@ -380,8 +398,26 @@ def _proximo_tipo_intermediario(entries_hoje: list[dict]) -> str:
 
 def _registrar_ponto(emp: dict, tipo: str) -> dict:
     now = datetime.now(SP_TZ)
+    entries = load_entries()
+
+    # trava anti-duplicidade: clique/toque duplo (comum no celular) não pode virar
+    # dois registros — o segundo clique dentro da janela devolve 429 em vez de
+    # criar um registro fantasma que desalinharia o ciclo de marcações do dia
+    ultimo = max(
+        (e for e in entries if e["employee_id"] == emp["id"]),
+        key=lambda e: e["timestamp"],
+        default=None,
+    )
+    if ultimo:
+        segundos = (now - datetime.fromisoformat(ultimo["timestamp"])).total_seconds()
+        if 0 <= segundos < DUPLICATE_GUARD_SECONDS:
+            raise HTTPException(
+                429,
+                f"Ponto já registrado há {int(segundos)}s ({ultimo['tipo'].replace('_', ' ')}). Aguarde um momento antes de bater de novo.",
+            )
+
     entry = {
-        "id": _next_id(load_entries()),
+        "id": _next_id(entries),
         "employee_id": emp["id"],
         "tipo": tipo,
         "timestamp": now.isoformat(),
@@ -393,7 +429,6 @@ def _registrar_ponto(emp: dict, tipo: str) -> dict:
         "corrected_by": None,
         "corrected_at": None,
     }
-    entries = load_entries()
     entries.append(entry)
     save_entries(entries)
     return entry
@@ -739,6 +774,31 @@ def corrigir_registro(entry_id: int, data: CorrecaoIn, admin: dict = Depends(req
     entry["corrected_at"] = datetime.now(SP_TZ).isoformat()
     save_entries(entries)
     return entry
+
+
+@app.post("/admin/registros/{entry_id}/excluir")
+def excluir_registro(entry_id: int, data: ExclusaoIn, admin: dict = Depends(require_admin)):
+    """Remove um registro incorreto (ex: duplicado por clique/toque duplo). Diferente da
+    correção, aqui o registro some da lista ativa — mas fica guardado em deleted_entries.json
+    com motivo/autor/data, pra manter rastro auditável (mesmo princípio das correções)."""
+    if not data.motivo.strip():
+        raise HTTPException(400, "motivo é obrigatório")
+    entries = load_entries()
+    entry = next((e for e in entries if e["id"] == entry_id), None)
+    if not entry:
+        raise HTTPException(404, "Registro não encontrado")
+    entries = [e for e in entries if e["id"] != entry_id]
+    save_entries(entries)
+
+    deleted = load_deleted_entries()
+    deleted.append({
+        **entry,
+        "excluido_motivo": data.motivo,
+        "excluido_por": admin["sub"],
+        "excluido_em": datetime.now(SP_TZ).isoformat(),
+    })
+    save_deleted_entries(deleted)
+    return {"ok": True}
 
 
 # ---------------- admin: solicitações ----------------
