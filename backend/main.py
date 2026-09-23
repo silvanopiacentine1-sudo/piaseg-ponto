@@ -20,7 +20,11 @@ if os.getenv("RENDER") and not os.getenv("DATA_DIR"):
 
 APP_DIR = Path(__file__).parent
 DATA_DIR = Path(os.getenv("DATA_DIR", str(APP_DIR)))
-SP_TZ = ZoneInfo("America/Sao_Paulo")
+# fuso da empresa (Mato Grosso do Sul, UTC-4) — NÃO é horário de Brasília (UTC-3).
+# Trocado de America/Sao_Paulo pra America/Campo_Grande em 2026-09-23: os computadores dos
+# funcionários já estavam certos em horário local de MS, mas o sistema gravava/exibia tudo
+# em horário de Brasília (1h à frente), o que também contribuía pra confusão nas marcações.
+EMPRESA_TZ = ZoneInfo("America/Campo_Grande")
 
 EMPLOYEES_FILE = DATA_DIR / "employees.json"
 TIME_ENTRIES_FILE = DATA_DIR / "time_entries.json"
@@ -122,10 +126,10 @@ def _next_id(items: list[dict]) -> int:
 
 
 def _parse_local(ts_str: str) -> datetime:
-    """Interpreta um timestamp vindo do frontend (datetime-local, sem fuso) como horário de SP."""
+    """Interpreta um timestamp vindo do frontend (datetime-local, sem fuso) como horário de MS."""
     ts = datetime.fromisoformat(ts_str)
     if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=SP_TZ)
+        ts = ts.replace(tzinfo=EMPRESA_TZ)
     return ts
 
 
@@ -382,7 +386,7 @@ def alterar_senha(data: AlterarSenhaIn, user: dict = Depends(get_current_user)):
 
 # ---------------- ponto (funcionário) ----------------
 def _today_entries(employee_id: int) -> list[dict]:
-    hoje = datetime.now(SP_TZ).date().isoformat()
+    hoje = datetime.now(EMPRESA_TZ).date().isoformat()
     entries = [e for e in load_entries() if e["employee_id"] == employee_id and e["data_local"] == hoje]
     return sorted(entries, key=lambda e: e["timestamp"])
 
@@ -402,7 +406,7 @@ def _proximo_tipo_intermediario(entries_hoje: list[dict]) -> str:
 
 
 def _registrar_ponto(emp: dict, tipo: str) -> dict:
-    now = datetime.now(SP_TZ)
+    now = datetime.now(EMPRESA_TZ)
     entries = load_entries()
 
     # trava anti-duplicidade: clique/toque duplo (comum no celular) não pode virar
@@ -533,7 +537,7 @@ def criar_solicitacao(data: SolicitacaoIn, user: dict = Depends(get_current_user
         "observacao": data.observacao,
         "anexo": data.anexo,
         "status": "pendente",
-        "criado_em": datetime.now(SP_TZ).isoformat(),
+        "criado_em": datetime.now(EMPRESA_TZ).isoformat(),
         "decidido_por": None,
         "decidido_em": None,
         "observacao_admin": "",
@@ -558,7 +562,7 @@ def minhas_solicitacoes(user: dict = Depends(get_current_user)):
 def criar_agendamento_ferias(data: AgendamentoFeriasIn, user: dict = Depends(get_current_user)):
     emp = require_employee_record(user)
     schedules = load_vacation_schedules()
-    agora = datetime.now(SP_TZ).isoformat()
+    agora = datetime.now(EMPRESA_TZ).isoformat()
     novo = {
         "id": _next_id(schedules),
         "employee_id": emp["id"],
@@ -604,7 +608,7 @@ def ajustar_agendamento_ferias_funcionario(sched_id: int, data: AjusteFeriasIn, 
         raise HTTPException(403, "Este agendamento não é seu")
     if sched["status"] != "pendente":
         raise HTTPException(409, "Agendamento já foi decidido, não pode mais ser ajustado")
-    agora = datetime.now(SP_TZ).isoformat()
+    agora = datetime.now(EMPRESA_TZ).isoformat()
     sched["data_inicio"] = data.data_inicio
     sched["data_fim"] = data.data_fim
     sched["proposto_por"] = "funcionario"
@@ -753,7 +757,7 @@ def registro_manual(data: RegistroManualIn, admin: dict = Depends(require_admin)
         "original_timestamp": None,
         "correction_reason": data.motivo,
         "corrected_by": admin["sub"],
-        "corrected_at": datetime.now(SP_TZ).isoformat(),
+        "corrected_at": datetime.now(EMPRESA_TZ).isoformat(),
     }
     entries.append(entry)
     save_entries(entries)
@@ -776,7 +780,7 @@ def corrigir_registro(entry_id: int, data: CorrecaoIn, admin: dict = Depends(req
     entry["corrected"] = True
     entry["correction_reason"] = data.motivo
     entry["corrected_by"] = admin["sub"]
-    entry["corrected_at"] = datetime.now(SP_TZ).isoformat()
+    entry["corrected_at"] = datetime.now(EMPRESA_TZ).isoformat()
     save_entries(entries)
     return entry
 
@@ -800,7 +804,7 @@ def excluir_registro(entry_id: int, data: ExclusaoIn, admin: dict = Depends(requ
         **entry,
         "excluido_motivo": data.motivo,
         "excluido_por": admin["sub"],
-        "excluido_em": datetime.now(SP_TZ).isoformat(),
+        "excluido_em": datetime.now(EMPRESA_TZ).isoformat(),
     })
     save_deleted_entries(deleted)
     return {"ok": True}
@@ -824,7 +828,7 @@ def _decidir_solicitacao(req_id: int, novo_status: str, data: DecisaoIn, admin: 
         raise HTTPException(409, "Solicitação já foi decidida")
     req["status"] = novo_status
     req["decidido_por"] = admin["sub"]
-    req["decidido_em"] = datetime.now(SP_TZ).isoformat()
+    req["decidido_em"] = datetime.now(EMPRESA_TZ).isoformat()
     req["observacao_admin"] = data.observacao_admin
     save_requests(reqs)
     return req
@@ -851,7 +855,7 @@ def abonar_lote(payload: AbonoLoteIn, admin: dict = Depends(require_admin)):
         raise HTTPException(400, "motivo é obrigatório")
     employees = [e for e in load_employees() if e["status"] == "ativo"]
     reqs = load_requests()
-    agora = datetime.now(SP_TZ).isoformat()
+    agora = datetime.now(EMPRESA_TZ).isoformat()
     criados = 0
     for emp in employees:
         ja_coberto = any(
@@ -882,7 +886,7 @@ def abonar_lote(payload: AbonoLoteIn, admin: dict = Depends(require_admin)):
 
 @app.get("/admin/feriados-nacionais")
 def listar_feriados_nacionais(ano: Optional[int] = None, _: dict = Depends(require_admin)):
-    ano = ano or datetime.now(SP_TZ).year
+    ano = ano or datetime.now(EMPRESA_TZ).year
     return sorted(d.isoformat() for d in feriados_nacionais(ano))
 
 
@@ -907,7 +911,7 @@ def ajustar_agendamento_ferias_admin(sched_id: int, data: AjusteFeriasIn, admin:
         raise HTTPException(404, "Agendamento não encontrado")
     if sched["status"] != "pendente":
         raise HTTPException(409, "Agendamento já foi decidido, não pode mais ser ajustado")
-    agora = datetime.now(SP_TZ).isoformat()
+    agora = datetime.now(EMPRESA_TZ).isoformat()
     sched["data_inicio"] = data.data_inicio
     sched["data_fim"] = data.data_fim
     sched["proposto_por"] = "admin"
@@ -928,7 +932,7 @@ def aprovar_agendamento_ferias(sched_id: int, data: DecisaoFeriasIn, admin: dict
         raise HTTPException(404, "Agendamento não encontrado")
     if sched["status"] != "pendente":
         raise HTTPException(409, "Agendamento já foi decidido")
-    agora = datetime.now(SP_TZ).isoformat()
+    agora = datetime.now(EMPRESA_TZ).isoformat()
 
     reqs = load_requests()
     leave_request = {
@@ -966,7 +970,7 @@ def rejeitar_agendamento_ferias(sched_id: int, data: DecisaoFeriasIn, admin: dic
         raise HTTPException(404, "Agendamento não encontrado")
     if sched["status"] != "pendente":
         raise HTTPException(409, "Agendamento já foi decidido")
-    agora = datetime.now(SP_TZ).isoformat()
+    agora = datetime.now(EMPRESA_TZ).isoformat()
     sched["status"] = "rejeitado"
     sched["decidido_por"] = admin["sub"]
     sched["decidido_em"] = agora
@@ -993,7 +997,7 @@ def _work_minutes_for_day(entries: list[dict]) -> int:
 
 
 def _dias_uteis_no_periodo(inicio: Optional[str], fim: Optional[str]) -> list[date]:
-    hoje = datetime.now(SP_TZ).date()
+    hoje = datetime.now(EMPRESA_TZ).date()
     data_inicio = date.fromisoformat(inicio) if inicio else hoje.replace(day=1)
     data_fim = min(date.fromisoformat(fim) if fim else hoje, hoje)
     dias_uteis = []

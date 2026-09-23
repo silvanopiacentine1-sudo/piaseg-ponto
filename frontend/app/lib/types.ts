@@ -137,10 +137,11 @@ export function formatMinutes(min: number): string {
   return `${sign}${h}h${String(m).padStart(2, "0")}`;
 }
 
-// horário sempre fixo em SP (a empresa é daqui), nunca no fuso do dispositivo de quem
-// está olhando a tela — celular/computador com fuso mal configurado mostrava hora errada
-// mesmo com o timestamp certo salvo no servidor
-export const TZ_EMPRESA = "America/Sao_Paulo";
+// horário sempre fixo no fuso da empresa (Mato Grosso do Sul, UTC-4 — NÃO é horário de
+// Brasília), nunca no fuso do dispositivo de quem está olhando a tela — celular/computador
+// com fuso mal configurado mostrava hora errada mesmo com o timestamp certo salvo no servidor.
+// Trocado de America/Sao_Paulo pra America/Campo_Grande em 2026-09-23.
+export const TZ_EMPRESA = "America/Campo_Grande";
 
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
@@ -153,8 +154,8 @@ export function formatDate(iso: string): string {
 }
 
 // valor pro campo <input type="datetime-local"> (ex: formulário de correção do admin) no
-// fuso de SP — mesmo motivo do TZ_EMPRESA acima, senão o campo pré-preenchia com a hora
-// errada quando o dispositivo do admin não estava no fuso de São Paulo
+// fuso da empresa — mesmo motivo do TZ_EMPRESA acima, senão o campo pré-preenchia com a hora
+// errada quando o dispositivo do admin não estava no fuso de Mato Grosso do Sul
 export function toDatetimeLocalSP(iso: string): string {
   const partes = new Intl.DateTimeFormat("en-CA", {
     timeZone: TZ_EMPRESA,
@@ -165,7 +166,7 @@ export function toDatetimeLocalSP(iso: string): string {
   return `${get("year")}-${get("month")}-${get("day")}T${hora}:${get("minute")}`;
 }
 
-// extrai hora/minuto no fuso de SP, não no fuso do dispositivo (mesmo motivo do TZ_EMPRESA acima)
+// extrai hora/minuto no fuso da empresa, não no fuso do dispositivo (mesmo motivo do TZ_EMPRESA acima)
 function horaMinutoSP(d: Date): [number, number] {
   const partes = new Intl.DateTimeFormat("en-US", { timeZone: TZ_EMPRESA, hour12: false, hour: "2-digit", minute: "2-digit" }).formatToParts(d);
   const h = Number(partes.find((p) => p.type === "hour")?.value ?? "0");
