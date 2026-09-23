@@ -201,6 +201,7 @@ export default function RegistrosPage() {
               <tr className="text-left text-gray-500 border-b border-gray-100">
                 <th className="py-2 px-4">Funcionário</th>
                 <th className="py-2 px-4">Data/Hora</th>
+                <th className="py-2 px-4">Ponto</th>
                 <th className="py-2 px-4">Tipo</th>
                 <th className="py-2 px-4">Origem</th>
                 <th className="py-2 px-4">Corrigido</th>
@@ -211,15 +212,22 @@ export default function RegistrosPage() {
               {entries.map((e) => {
                 const atrasado = entradaAtrasada(e, jornadaEntradaDe(e.employee_id));
                 const pos = saidaPosExpediente(e, jornadaSaidaDe(e.employee_id));
+                // "Em dia" só faz sentido pra entrada/saída, que são os únicos tipos com
+                // regra de horário esperado comparável (jornada.entrada/jornada.saida) —
+                // saída almoço/retorno/intermediário ficam sem selo, sem regra definida pra eles
+                const status = e.tipo === "entrada" ? (atrasado ? "atrasado" : "em_dia")
+                  : e.tipo === "saida" ? (pos ? "pos" : "em_dia")
+                  : null;
                 return (
                   <tr key={e.id} className="border-b border-gray-50">
                     <td className="py-2 px-4">{nomeDe(e.employee_id)}</td>
                     <td className={`py-2 px-4 tabular-nums ${atrasado ? "text-red-600 font-semibold" : pos ? "text-green-600 font-semibold" : ""}`}>{formatDateTime(e.timestamp)}</td>
                     <td className="py-2 px-4">
-                      {atrasado && <span className="mr-1.5 text-[10px] text-red-600 font-medium align-middle">ATRASADO</span>}
-                      {pos && <span className="mr-1.5 text-[10px] text-green-600 font-medium align-middle">Pós</span>}
-                      {PUNCH_LABELS[e.tipo]}
+                      {status === "atrasado" && <span className="text-[10px] text-red-600 font-semibold uppercase">Atrasado</span>}
+                      {status === "pos" && <span className="text-[10px] text-green-600 font-semibold uppercase">Pós</span>}
+                      {status === "em_dia" && <span className="text-[10px] text-gray-400 font-medium uppercase">Em dia</span>}
                     </td>
+                    <td className="py-2 px-4">{PUNCH_LABELS[e.tipo]}</td>
                     <td className="py-2 px-4 text-gray-500">{e.origem === "admin" ? "Admin" : "Funcionário"}</td>
                     <td className="py-2 px-4">
                       {e.corrected ? <span title={e.correction_reason ?? ""} className="text-xs text-twine-dark cursor-help">Sim</span> : ""}
