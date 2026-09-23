@@ -178,22 +178,43 @@ function horaMinutoSP(d: Date): [number, number] {
 // pegar diferenças de poucos minutos (ex: relógio arredondando, trânsito no elevador)
 export const TOLERANCIA_PONTO_MIN = 5;
 
+function diffMinutos(entry: { timestamp: string }, horarioEsperado: string): number {
+  const [hEsperado, mEsperado] = horarioEsperado.split(":").map(Number);
+  const [hReal, mReal] = horaMinutoSP(new Date(entry.timestamp));
+  return hReal * 60 + mReal - (hEsperado * 60 + mEsperado);
+}
+
 export function entradaAtrasada(entry: { tipo: PunchType; timestamp: string }, jornadaEntrada: string | null | undefined): boolean {
   if (entry.tipo !== "entrada" || !jornadaEntrada) return false;
-  const [hEsperado, mEsperado] = jornadaEntrada.split(":").map(Number);
-  const [hReal, mReal] = horaMinutoSP(new Date(entry.timestamp));
-  const minutosReais = hReal * 60 + mReal;
-  const minutosEsperados = hEsperado * 60 + mEsperado;
-  return minutosReais > minutosEsperados + TOLERANCIA_PONTO_MIN;
+  return diffMinutos(entry, jornadaEntrada) > TOLERANCIA_PONTO_MIN;
 }
 
 // saída registrada depois do fim do expediente (com tolerância) — pedido do Silvano em
 // 2026-09-23, mesmo princípio do entradaAtrasada() mas pro outro lado do dia
 export function saidaPosExpediente(entry: { tipo: PunchType; timestamp: string }, jornadaSaida: string | null | undefined): boolean {
   if (entry.tipo !== "saida" || !jornadaSaida) return false;
-  const [hEsperado, mEsperado] = jornadaSaida.split(":").map(Number);
-  const [hReal, mReal] = horaMinutoSP(new Date(entry.timestamp));
-  const minutosReais = hReal * 60 + mReal;
-  const minutosEsperados = hEsperado * 60 + mEsperado;
-  return minutosReais > minutosEsperados + TOLERANCIA_PONTO_MIN;
+  return diffMinutos(entry, jornadaSaida) > TOLERANCIA_PONTO_MIN;
+}
+
+export type PontoStatus = "atrasado" | "em_dia" | "pos";
+
+// status do ponto conforme a regra de horário — pedido do Silvano em 2026-09-23. "Chegada"
+// (entrada, retorno de almoço): Atrasado quando bate depois do esperado, Em dia se não.
+// "Saída" (saída pro almoço, saída do fim de expediente): Pós quando bate depois do
+// esperado (ficou trabalhando além do horário), Em dia se não. Os outros tipos (saída/
+// retorno intermediário) não têm horário esperado configurável, retorna null.
+export function pontoStatus(entry: { tipo: PunchType; timestamp: string }, jornada: Jornada | null | undefined): PontoStatus | null {
+  if (!jornada) return null;
+  switch (entry.tipo) {
+    case "entrada":
+      return diffMinutos(entry, jornada.entrada) > TOLERANCIA_PONTO_MIN ? "atrasado" : "em_dia";
+    case "retorno_almoco":
+      return diffMinutos(entry, jornada.retorno_almoco) > TOLERANCIA_PONTO_MIN ? "atrasado" : "em_dia";
+    case "saida_almoco":
+      return diffMinutos(entry, jornada.saida_almoco) > TOLERANCIA_PONTO_MIN ? "pos" : "em_dia";
+    case "saida":
+      return diffMinutos(entry, jornada.saida) > TOLERANCIA_PONTO_MIN ? "pos" : "em_dia";
+    default:
+      return null;
+  }
 }
