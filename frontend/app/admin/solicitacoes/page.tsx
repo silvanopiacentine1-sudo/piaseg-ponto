@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Header from "../../components/Header";
 import { apiJson, downloadFile } from "../../lib/api";
-import { Employee, LeaveRequest, TZ_EMPRESA } from "../../lib/types";
+import { Employee, EMPRESAS, LeaveRequest, TZ_EMPRESA } from "../../lib/types";
 
 const STATUS_LABELS: Record<string, string> = { pendente: "Pendente", aprovado: "Aprovado", rejeitado: "Rejeitado" };
 const STATUS_COLORS: Record<string, string> = {
@@ -17,6 +17,7 @@ export default function SolicitacoesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [tipos, setTipos] = useState<string[]>([]);
   const [filtro, setFiltro] = useState("pendente");
+  const [empresaFiltro, setEmpresaFiltro] = useState("");
   const [processando, setProcessando] = useState<number | null>(null);
 
   const [showAbono, setShowAbono] = useState(false);
@@ -47,6 +48,10 @@ export default function SolicitacoesPage() {
   function nomeDe(id: number): string {
     return employees.find((e) => e.id === id)?.nome ?? `#${id}`;
   }
+
+  const requestsFiltrados = requests.filter(
+    (r) => !empresaFiltro || employees.find((e) => e.id === r.employee_id)?.empresa === empresaFiltro
+  );
 
   async function decidir(id: number, acao: "aprovar" | "rejeitar") {
     setProcessando(id);
@@ -92,6 +97,12 @@ export default function SolicitacoesPage() {
             >
               {showAbono ? "Cancelar" : "+ Abonar em lote"}
             </button>
+            <select value={empresaFiltro} onChange={(e) => setEmpresaFiltro(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">Todas as empresas</option>
+              {EMPRESAS.map((emp) => (
+                <option key={emp} value={emp}>{emp}</option>
+              ))}
+            </select>
             <select value={filtro} onChange={(e) => setFiltro(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
               <option value="pendente">Pendentes</option>
               <option value="aprovado">Aprovadas</option>
@@ -137,7 +148,7 @@ export default function SolicitacoesPage() {
         )}
 
         <div className="bg-white rounded-xl shadow divide-y divide-gray-100">
-          {requests.map((r) => (
+          {requestsFiltrados.map((r) => (
             <div key={r.id} className="p-4 flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-sm font-medium text-gray-800">{nomeDe(r.employee_id)} — {r.tipo}</p>
@@ -176,7 +187,7 @@ export default function SolicitacoesPage() {
               )}
             </div>
           ))}
-          {requests.length === 0 && <p className="text-sm text-gray-400 p-4">Nenhuma solicitação encontrada.</p>}
+          {requestsFiltrados.length === 0 && <p className="text-sm text-gray-400 p-4">Nenhuma solicitação encontrada.</p>}
         </div>
       </main>
     </div>

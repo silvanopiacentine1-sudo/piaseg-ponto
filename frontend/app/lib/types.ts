@@ -174,11 +174,15 @@ function horaMinutoSP(d: Date): [number, number] {
   return [h === 24 ? 0 : h, m];
 }
 
+// tolerância antes de marcar "atrasado" — pedido do Silvano em 2026-09-23, pra não
+// pegar diferenças de poucos minutos (ex: relógio arredondando, trânsito no elevador)
+export const TOLERANCIA_ATRASO_MIN = 5;
+
 export function entradaAtrasada(entry: { tipo: PunchType; timestamp: string }, jornadaEntrada: string | null | undefined): boolean {
   if (entry.tipo !== "entrada" || !jornadaEntrada) return false;
   const [hEsperado, mEsperado] = jornadaEntrada.split(":").map(Number);
   const [hReal, mReal] = horaMinutoSP(new Date(entry.timestamp));
   const minutosReais = hReal * 60 + mReal;
   const minutosEsperados = hEsperado * 60 + mEsperado;
-  return minutosReais > minutosEsperados;
+  return minutosReais > minutosEsperados + TOLERANCIA_ATRASO_MIN;
 }

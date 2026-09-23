@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Header from "../../components/Header";
 import { apiJson, downloadFile } from "../../lib/api";
-import { Employee, EMPRESAS, formatDateTime, PUNCH_LABELS, TimeEntry, toDatetimeLocalSP } from "../../lib/types";
+import { Employee, EMPRESAS, entradaAtrasada, formatDateTime, PUNCH_LABELS, TimeEntry, toDatetimeLocalSP } from "../../lib/types";
 
 export default function RegistrosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -43,6 +43,10 @@ export default function RegistrosPage() {
 
   function nomeDe(id: number): string {
     return employees.find((e) => e.id === id)?.nome ?? `#${id}`;
+  }
+
+  function jornadaEntradaDe(id: number): string | null {
+    return employees.find((e) => e.id === id)?.jornada?.entrada ?? null;
   }
 
   function abrirCorrecao(e: TimeEntry) {
@@ -200,21 +204,27 @@ export default function RegistrosPage() {
               </tr>
             </thead>
             <tbody>
-              {entries.map((e) => (
-                <tr key={e.id} className="border-b border-gray-50">
-                  <td className="py-2 px-4">{nomeDe(e.employee_id)}</td>
-                  <td className="py-2 px-4 tabular-nums">{formatDateTime(e.timestamp)}</td>
-                  <td className="py-2 px-4">{PUNCH_LABELS[e.tipo]}</td>
-                  <td className="py-2 px-4 text-gray-500">{e.origem === "admin" ? "Admin" : "Funcionário"}</td>
-                  <td className="py-2 px-4">
-                    {e.corrected ? <span title={e.correction_reason ?? ""} className="text-xs text-twine-dark cursor-help">Sim</span> : ""}
-                  </td>
-                  <td className="py-2 px-4 text-right whitespace-nowrap">
-                    <button onClick={() => abrirCorrecao(e)} className="text-tiber hover:underline text-xs mr-3">Corrigir</button>
-                    <button onClick={() => abrirExclusao(e)} className="text-red-600 hover:underline text-xs">Excluir</button>
-                  </td>
-                </tr>
-              ))}
+              {entries.map((e) => {
+                const atrasado = entradaAtrasada(e, jornadaEntradaDe(e.employee_id));
+                return (
+                  <tr key={e.id} className="border-b border-gray-50">
+                    <td className="py-2 px-4">{nomeDe(e.employee_id)}</td>
+                    <td className={`py-2 px-4 tabular-nums ${atrasado ? "text-red-600 font-semibold" : ""}`}>{formatDateTime(e.timestamp)}</td>
+                    <td className="py-2 px-4">
+                      {PUNCH_LABELS[e.tipo]}
+                      {atrasado && <span className="ml-1.5 text-[10px] text-red-600 font-medium align-middle">ATRASADO</span>}
+                    </td>
+                    <td className="py-2 px-4 text-gray-500">{e.origem === "admin" ? "Admin" : "Funcionário"}</td>
+                    <td className="py-2 px-4">
+                      {e.corrected ? <span title={e.correction_reason ?? ""} className="text-xs text-twine-dark cursor-help">Sim</span> : ""}
+                    </td>
+                    <td className="py-2 px-4 text-right whitespace-nowrap">
+                      <button onClick={() => abrirCorrecao(e)} className="text-tiber hover:underline text-xs mr-3">Corrigir</button>
+                      <button onClick={() => abrirExclusao(e)} className="text-red-600 hover:underline text-xs">Excluir</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {entries.length === 0 && <p className="text-sm text-gray-400 p-4">Nenhum registro encontrado.</p>}
