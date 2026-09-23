@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Header from "../../components/Header";
 import { apiJson, downloadFile } from "../../lib/api";
-import { Employee, EMPRESAS, entradaAtrasada, formatDateTime, PUNCH_LABELS, TimeEntry, toDatetimeLocalSP } from "../../lib/types";
+import { Employee, EMPRESAS, entradaAtrasada, formatDateTime, PUNCH_LABELS, saidaPosExpediente, TimeEntry, toDatetimeLocalSP } from "../../lib/types";
 
 export default function RegistrosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -47,6 +47,10 @@ export default function RegistrosPage() {
 
   function jornadaEntradaDe(id: number): string | null {
     return employees.find((e) => e.id === id)?.jornada?.entrada ?? null;
+  }
+
+  function jornadaSaidaDe(id: number): string | null {
+    return employees.find((e) => e.id === id)?.jornada?.saida ?? null;
   }
 
   function abrirCorrecao(e: TimeEntry) {
@@ -206,13 +210,15 @@ export default function RegistrosPage() {
             <tbody>
               {entries.map((e) => {
                 const atrasado = entradaAtrasada(e, jornadaEntradaDe(e.employee_id));
+                const pos = saidaPosExpediente(e, jornadaSaidaDe(e.employee_id));
                 return (
                   <tr key={e.id} className="border-b border-gray-50">
                     <td className="py-2 px-4">{nomeDe(e.employee_id)}</td>
-                    <td className={`py-2 px-4 tabular-nums ${atrasado ? "text-red-600 font-semibold" : ""}`}>{formatDateTime(e.timestamp)}</td>
+                    <td className={`py-2 px-4 tabular-nums ${atrasado ? "text-red-600 font-semibold" : pos ? "text-green-600 font-semibold" : ""}`}>{formatDateTime(e.timestamp)}</td>
                     <td className="py-2 px-4">
+                      {atrasado && <span className="mr-1.5 text-[10px] text-red-600 font-medium align-middle">ATRASADO</span>}
+                      {pos && <span className="mr-1.5 text-[10px] text-green-600 font-medium align-middle">Pós</span>}
                       {PUNCH_LABELS[e.tipo]}
-                      {atrasado && <span className="ml-1.5 text-[10px] text-red-600 font-medium align-middle">ATRASADO</span>}
                     </td>
                     <td className="py-2 px-4 text-gray-500">{e.origem === "admin" ? "Admin" : "Funcionário"}</td>
                     <td className="py-2 px-4">

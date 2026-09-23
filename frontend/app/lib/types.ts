@@ -174,9 +174,9 @@ function horaMinutoSP(d: Date): [number, number] {
   return [h === 24 ? 0 : h, m];
 }
 
-// tolerância antes de marcar "atrasado" — pedido do Silvano em 2026-09-23, pra não
+// tolerância antes de marcar "atrasado"/"pós" — pedido do Silvano em 2026-09-23, pra não
 // pegar diferenças de poucos minutos (ex: relógio arredondando, trânsito no elevador)
-export const TOLERANCIA_ATRASO_MIN = 5;
+export const TOLERANCIA_PONTO_MIN = 5;
 
 export function entradaAtrasada(entry: { tipo: PunchType; timestamp: string }, jornadaEntrada: string | null | undefined): boolean {
   if (entry.tipo !== "entrada" || !jornadaEntrada) return false;
@@ -184,5 +184,16 @@ export function entradaAtrasada(entry: { tipo: PunchType; timestamp: string }, j
   const [hReal, mReal] = horaMinutoSP(new Date(entry.timestamp));
   const minutosReais = hReal * 60 + mReal;
   const minutosEsperados = hEsperado * 60 + mEsperado;
-  return minutosReais > minutosEsperados + TOLERANCIA_ATRASO_MIN;
+  return minutosReais > minutosEsperados + TOLERANCIA_PONTO_MIN;
+}
+
+// saída registrada depois do fim do expediente (com tolerância) — pedido do Silvano em
+// 2026-09-23, mesmo princípio do entradaAtrasada() mas pro outro lado do dia
+export function saidaPosExpediente(entry: { tipo: PunchType; timestamp: string }, jornadaSaida: string | null | undefined): boolean {
+  if (entry.tipo !== "saida" || !jornadaSaida) return false;
+  const [hEsperado, mEsperado] = jornadaSaida.split(":").map(Number);
+  const [hReal, mReal] = horaMinutoSP(new Date(entry.timestamp));
+  const minutosReais = hReal * 60 + mReal;
+  const minutosEsperados = hEsperado * 60 + mEsperado;
+  return minutosReais > minutosEsperados + TOLERANCIA_PONTO_MIN;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Header from "../components/Header";
 import { apiJson } from "../lib/api";
-import { entradaAtrasada, Jornada, PUNCH_LABELS, TimeEntry, TZ_EMPRESA } from "../lib/types";
+import { entradaAtrasada, Jornada, PUNCH_LABELS, saidaPosExpediente, TimeEntry, TZ_EMPRESA } from "../lib/types";
 
 interface StatusHoje {
   registros_hoje: TimeEntry[];
@@ -131,13 +131,15 @@ export default function PontoPage() {
           <ul className="space-y-2">
             {status?.registros_hoje.map((e) => {
               const atrasado = entradaAtrasada(e, jornada?.entrada);
+              const pos = saidaPosExpediente(e, jornada?.saida);
               return (
                 <li key={e.id} className="flex justify-between text-sm border-b border-gray-100 pb-2 last:border-0">
                   <span className="text-gray-700">
+                    {atrasado && <span className="mr-1.5 text-[10px] text-red-600 font-medium align-middle">ATRASADO</span>}
+                    {pos && <span className="mr-1.5 text-[10px] text-green-600 font-medium align-middle">Pós</span>}
                     {PUNCH_LABELS[e.tipo]}
-                    {atrasado && <span className="ml-1.5 text-[10px] text-red-600 font-medium align-middle">ATRASADO</span>}
                   </span>
-                  <span className={`tabular-nums ${atrasado ? "text-red-600 font-semibold" : "text-gray-500"}`}>
+                  <span className={`tabular-nums ${atrasado ? "text-red-600 font-semibold" : pos ? "text-green-600 font-semibold" : "text-gray-500"}`}>
                     {new Date(e.timestamp).toLocaleTimeString("pt-BR", { timeZone: TZ_EMPRESA })}
                   </span>
                 </li>

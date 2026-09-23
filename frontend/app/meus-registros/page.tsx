@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Header from "../components/Header";
 import { apiJson, downloadFile, uploadFile } from "../lib/api";
-import { entradaAtrasada, formatDateTime, Jornada, LeaveRequest, PUNCH_LABELS, TimeEntry } from "../lib/types";
+import { entradaAtrasada, formatDateTime, Jornada, LeaveRequest, PUNCH_LABELS, saidaPosExpediente, TimeEntry } from "../lib/types";
 
 const STATUS_LABELS: Record<string, string> = { pendente: "Pendente", aprovado: "Aprovado", rejeitado: "Rejeitado" };
 const STATUS_COLORS: Record<string, string> = {
@@ -221,12 +221,14 @@ export default function MeusRegistrosPage() {
               <tbody>
                 {entries.map((e) => {
                   const atrasado = entradaAtrasada(e, jornada?.entrada);
+                  const pos = saidaPosExpediente(e, jornada?.saida);
                   return (
                     <tr key={e.id} className="border-b border-gray-50">
-                      <td className={`py-2 pr-4 tabular-nums ${atrasado ? "text-red-600 font-semibold" : ""}`}>{formatDateTime(e.timestamp)}</td>
+                      <td className={`py-2 pr-4 tabular-nums ${atrasado ? "text-red-600 font-semibold" : pos ? "text-green-600 font-semibold" : ""}`}>{formatDateTime(e.timestamp)}</td>
                       <td className="py-2 pr-4">
+                        {atrasado && <span className="mr-1.5 text-[10px] text-red-600 font-medium">ATRASADO</span>}
+                        {pos && <span className="mr-1.5 text-[10px] text-green-600 font-medium">Pós</span>}
                         {PUNCH_LABELS[e.tipo]}
-                        {atrasado && <span className="ml-1.5 text-[10px] text-red-600 font-medium">ATRASADO</span>}
                       </td>
                       <td className="py-2">{e.corrected ? <span className="text-xs text-twine-dark">Sim</span> : ""}</td>
                     </tr>
