@@ -137,9 +137,14 @@ export function formatMinutes(min: number): string {
   return `${sign}${h}h${String(m).padStart(2, "0")}`;
 }
 
+// horário sempre fixo em SP (a empresa é daqui), nunca no fuso do dispositivo de quem
+// está olhando a tela — celular/computador com fuso mal configurado mostrava hora errada
+// mesmo com o timestamp certo salvo no servidor
+export const TZ_EMPRESA = "America/Sao_Paulo";
+
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: TZ_EMPRESA });
 }
 
 export function formatDate(iso: string): string {
@@ -147,11 +152,32 @@ export function formatDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
+// valor pro campo <input type="datetime-local"> (ex: formulário de correção do admin) no
+// fuso de SP — mesmo motivo do TZ_EMPRESA acima, senão o campo pré-preenchia com a hora
+// errada quando o dispositivo do admin não estava no fuso de São Paulo
+export function toDatetimeLocalSP(iso: string): string {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ_EMPRESA,
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
+  const hora = get("hour") === "24" ? "00" : get("hour");
+  return `${get("year")}-${get("month")}-${get("day")}T${hora}:${get("minute")}`;
+}
+
+// extrai hora/minuto no fuso de SP, não no fuso do dispositivo (mesmo motivo do TZ_EMPRESA acima)
+function horaMinutoSP(d: Date): [number, number] {
+  const partes = new Intl.DateTimeFormat("en-US", { timeZone: TZ_EMPRESA, hour12: false, hour: "2-digit", minute: "2-digit" }).formatToParts(d);
+  const h = Number(partes.find((p) => p.type === "hour")?.value ?? "0");
+  const m = Number(partes.find((p) => p.type === "minute")?.value ?? "0");
+  return [h === 24 ? 0 : h, m];
+}
+
 export function entradaAtrasada(entry: { tipo: PunchType; timestamp: string }, jornadaEntrada: string | null | undefined): boolean {
   if (entry.tipo !== "entrada" || !jornadaEntrada) return false;
   const [hEsperado, mEsperado] = jornadaEntrada.split(":").map(Number);
-  const d = new Date(entry.timestamp);
-  const minutosReais = d.getHours() * 60 + d.getMinutes();
+  const [hReal, mReal] = horaMinutoSP(new Date(entry.timestamp));
+  const minutosReais = hReal * 60 + mReal;
   const minutosEsperados = hEsperado * 60 + mEsperado;
   return minutosReais > minutosEsperados;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Header from "../../components/Header";
 import { apiJson, downloadFile } from "../../lib/api";
-import { Employee, EMPRESAS, formatDateTime, PUNCH_LABELS, TimeEntry } from "../../lib/types";
+import { Employee, EMPRESAS, formatDateTime, PUNCH_LABELS, TimeEntry, toDatetimeLocalSP } from "../../lib/types";
 
 export default function RegistrosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -48,9 +48,7 @@ export default function RegistrosPage() {
   function abrirCorrecao(e: TimeEntry) {
     setExcluindo(null);
     setCorrigindo(e);
-    const d = new Date(e.timestamp);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    setNovoHorario(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    setNovoHorario(toDatetimeLocalSP(e.timestamp));
     setMotivo("");
     setErro("");
   }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Header from "../../components/Header";
 import { apiJson, downloadFile } from "../../lib/api";
-import { Employee, LeaveRequest } from "../../lib/types";
+import { Employee, LeaveRequest, TZ_EMPRESA } from "../../lib/types";
 
 const STATUS_LABELS: Record<string, string> = { pendente: "Pendente", aprovado: "Aprovado", rejeitado: "Rejeitado" };
 const STATUS_COLORS: Record<string, string> = {
@@ -151,7 +151,7 @@ export default function SolicitacoesPage() {
                   </button>
                 )}
                 {r.status !== "pendente" && (
-                  <p className="text-xs text-gray-400 mt-1">Decidido por {r.decidido_por} em {r.decidido_em ? new Date(r.decidido_em).toLocaleDateString("pt-BR") : ""}</p>
+                  <p className="text-xs text-gray-400 mt-1">Decidido por {r.decidido_por} em {r.decidido_em ? new Date(r.decidido_em).toLocaleDateString("pt-BR", { timeZone: TZ_EMPRESA }) : ""}</p>
                 )}
               </div>
               {r.status === "pendente" ? (

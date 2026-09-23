@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Header from "../components/Header";
 import { apiJson } from "../lib/api";
-import { entradaAtrasada, Jornada, PUNCH_LABELS, TimeEntry } from "../lib/types";
+import { entradaAtrasada, Jornada, PUNCH_LABELS, TimeEntry, TZ_EMPRESA } from "../lib/types";
 
 interface StatusHoje {
   registros_hoje: TimeEntry[];
@@ -88,8 +88,8 @@ export default function PontoPage() {
       <Header />
       <main className="flex-1 max-w-md mx-auto w-full px-4 py-8 flex flex-col items-center gap-6">
         <div className="text-center">
-          <p className="text-gray-500 text-sm">{relogio.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</p>
-          <p className="font-heading text-4xl text-tiber tabular-nums">{relogio.toLocaleTimeString("pt-BR")}</p>
+          <p className="text-gray-500 text-sm">{relogio.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric", timeZone: TZ_EMPRESA })}</p>
+          <p className="font-heading text-4xl text-tiber tabular-nums">{relogio.toLocaleTimeString("pt-BR", { timeZone: TZ_EMPRESA })}</p>
         </div>
 
         {mensagem && (
@@ -138,7 +138,7 @@ export default function PontoPage() {
                     {atrasado && <span className="ml-1.5 text-[10px] text-red-600 font-medium align-middle">ATRASADO</span>}
                   </span>
                   <span className={`tabular-nums ${atrasado ? "text-red-600 font-semibold" : "text-gray-500"}`}>
-                    {new Date(e.timestamp).toLocaleTimeString("pt-BR")}
+                    {new Date(e.timestamp).toLocaleTimeString("pt-BR", { timeZone: TZ_EMPRESA })}
                   </span>
                 </li>
               );

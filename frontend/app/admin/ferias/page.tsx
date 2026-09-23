@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Header from "../../components/Header";
 import { apiJson } from "../../lib/api";
-import { Employee, VacationSchedule } from "../../lib/types";
+import { Employee, VacationSchedule, TZ_EMPRESA } from "../../lib/types";
 
 const STATUS_LABELS: Record<string, string> = { pendente: "Pendente", aprovado: "Aprovado", rejeitado: "Rejeitado" };
 const STATUS_COLORS: Record<string, string> = {
@@ -109,7 +109,7 @@ export default function AdminFeriasPage() {
                 </p>
               )}
               {s.status !== "pendente" && s.decidido_por && (
-                <p className="text-xs text-gray-400 mt-1">Decidido por {s.decidido_por} em {s.decidido_em ? new Date(s.decidido_em).toLocaleDateString("pt-BR") : ""}</p>
+                <p className="text-xs text-gray-400 mt-1">Decidido por {s.decidido_por} em {s.decidido_em ? new Date(s.decidido_em).toLocaleDateString("pt-BR", { timeZone: TZ_EMPRESA }) : ""}</p>
               )}
 
               {s.historico.length > 1 && (

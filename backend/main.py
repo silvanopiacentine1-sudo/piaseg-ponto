@@ -31,8 +31,13 @@ DELETED_ENTRIES_FILE = DATA_DIR / "deleted_entries.json"
 
 # tempo mínimo entre duas marcações de ponto do mesmo funcionário — trava clique/toque
 # duplo (mobile principalmente), que criava registros fantasma e desalinhava o ciclo
-# entrada/saída almoço/retorno almoço/saída pro resto do dia
-DUPLICATE_GUARD_SECONDS = 8
+# entrada/saída almoço/retorno almoço/saída pro resto do dia.
+# 8s (versão original) não pegou um caso real: funcionária clicou de novo 58s depois
+# (achando que não tinha registrado, provavelmente por causa do bug do relógio/horário
+# mostrando fuso errado) e criou uma marcação fantasma mesmo assim. 90s dá margem folgada
+# pra cobrir isso sem esbarrar em uso legítimo (saída/retorno rápido real fica na casa de
+# minutos, não segundos).
+DUPLICATE_GUARD_SECONDS = 90
 
 _BUNDLED = {
     EMPLOYEES_FILE: APP_DIR / "employees.json",
